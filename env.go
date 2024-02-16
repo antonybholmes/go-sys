@@ -3,7 +3,20 @@ package env
 import (
 	"os"
 	"strconv"
+
+	"github.com/joho/godotenv"
+	"github.com/rs/zerolog/log"
 )
+
+func Load() error {
+	err := godotenv.Load()
+
+	if err != nil {
+		log.Error().Msgf("Error loading .env file(s)")
+	}
+
+	return err
+}
 
 func GetStr(name string, def string) string {
 	ret := os.Getenv(name)
