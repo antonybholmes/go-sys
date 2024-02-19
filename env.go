@@ -2,6 +2,7 @@ package env
 
 import (
 	"os"
+	"sort"
 	"strconv"
 
 	"github.com/joho/godotenv"
@@ -9,13 +10,25 @@ import (
 )
 
 func Load() error {
-	err := godotenv.Load()
+	// force reloading
+	err := godotenv.Overload()
 
 	if err != nil {
 		log.Error().Msgf("Error loading .env file(s)")
 	}
 
 	return err
+}
+
+func Ls() {
+
+	envs := os.Environ()
+
+	sort.Strings(envs)
+
+	for _, e := range envs {
+		log.Debug().Msgf("%s", e)
+	}
 }
 
 func GetStr(name string, def string) string {
