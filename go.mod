@@ -1,4 +1,4 @@
-module github.com/antonybholmes/go-env
+module github.com/antonybholmes/go-sys
 
 go 1.22.0
 
