@@ -9,15 +9,14 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-func Load() error {
+func Load() {
 	// force reloading
 	err := godotenv.Overload()
 
 	if err != nil {
-		log.Error().Msgf("Error loading .env file(s)")
+		log.Fatal().Msgf("Error loading .env file(s)")
 	}
 
-	return err
 }
 
 func Ls() {
