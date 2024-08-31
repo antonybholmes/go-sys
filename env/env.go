@@ -4,6 +4,7 @@ import (
 	"os"
 	"sort"
 	"strconv"
+	"time"
 
 	"github.com/joho/godotenv"
 	"github.com/rs/zerolog/log"
@@ -30,30 +31,47 @@ func Ls() {
 	}
 }
 
+func Get(name string) string {
+
+	return os.Getenv(name)
+}
+
 func GetStr(name string, def string) string {
-	ret := os.Getenv(name)
+	ret := Get(name)
 
 	if ret == "" {
-		ret = def
+		return ret
 	}
 
-	return ret
+	return def
 }
 
 func GetUint32(name string, def uint) uint {
-	v := os.Getenv(name)
-
-	var ret uint
+	v := Get(name)
 
 	if v != "" {
 		c, err := strconv.ParseUint(v, 10, 32)
 
 		if err == nil {
-			ret = uint(c)
-		} else {
-			ret = def
+			return uint(c)
 		}
 	}
 
-	return ret
+	return def
+}
+
+// Interpret an env variable as a duration or return
+// a default if the variable is not found
+func GetMin(name string, def time.Duration) time.Duration {
+	v := Get(name)
+
+	if v != "" {
+		c, err := strconv.ParseUint(v, 10, 32)
+
+		if err == nil {
+			return time.Duration(c) * time.Minute
+		}
+	}
+
+	return def
 }
