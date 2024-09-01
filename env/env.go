@@ -63,13 +63,22 @@ func GetUint32(name string, def uint) uint {
 // Interpret an env variable as a duration or return
 // a default if the variable is not found
 func GetMin(name string, def time.Duration) time.Duration {
+	return GetTime(name, time.Minute, def)
+}
+
+func GetHour(name string, def time.Duration) time.Duration {
+	return GetTime(name, time.Hour, def)
+}
+
+func GetTime(name string, unit time.Duration, def time.Duration) time.Duration {
 	v := Get(name)
 
 	if v != "" {
-		c, err := strconv.ParseUint(v, 10, 32)
+		c, err := strconv.ParseInt(v, 10, 32)
 
 		if err == nil {
-			return time.Duration(c) * time.Minute
+			log.Debug().Msgf("found %v with value %d", name, c)
+			return time.Duration(c) * unit
 		}
 	}
 
