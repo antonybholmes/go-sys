@@ -10,7 +10,9 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-func Load() {
+func init() {
+	log.Debug().Msgf("loading envs...")
+
 	// force reloading
 	err := godotenv.Overload()
 
@@ -18,6 +20,10 @@ func Load() {
 		log.Fatal().Msgf("Error loading .env file(s)")
 	}
 
+}
+
+func Load(file string) {
+	godotenv.Load(file)
 }
 
 func Ls() {
@@ -32,14 +38,13 @@ func Ls() {
 }
 
 func Get(name string) string {
-
 	return os.Getenv(name)
 }
 
 func GetStr(name string, def string) string {
 	ret := Get(name)
 
-	if ret == "" {
+	if ret != "" {
 		return ret
 	}
 
