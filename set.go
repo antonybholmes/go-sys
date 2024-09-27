@@ -1,5 +1,7 @@
 package sys
 
+import "slices"
+
 // Implementation of a set
 type Set[T comparable] map[T]struct{}
 
@@ -8,7 +10,12 @@ func NewSet[T comparable]() *Set[T] {
 	return &s
 }
 
-// Adds an animal to the set
+// Adds length function
+func (s *Set[T]) Len() int {
+	return len(*s)
+}
+
+// Adds to the set
 func (s *Set[T]) Add(v T) {
 	(*s)[v] = struct{}{}
 }
@@ -65,4 +72,17 @@ func (s *Set[T]) UpdateList(values []T) *Set[T] {
 	}
 
 	return s
+}
+
+func StringSetSort(s *Set[string]) []string {
+
+	sortedGenes := make([]string, 0, len(*s))
+
+	for key := range *s {
+		sortedGenes = append(sortedGenes, key)
+	}
+
+	slices.Sort(sortedGenes)
+
+	return sortedGenes
 }
