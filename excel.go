@@ -8,12 +8,12 @@ import (
 )
 
 type Table struct {
-	index   []string   `json:"index"`
-	columns []string   `json:"columns"`
-	data    [][]string `json:"data"`
+	Index   [][]string `json:"index"`
+	Columns [][]string `json:"columns"`
+	Data    [][]string `json:"data"`
 }
 
-func xlsx_to_text(input []byte, index int, header int) (*Table, error) {
+func XlsxToText(input []byte, index int, header int) (*Table, error) {
 	r := bytes.NewReader(input)
 
 	f, err := excelize.OpenReader(r) // .OpenFile("Book1.xlsx")
@@ -60,18 +60,12 @@ func xlsx_to_text(input []byte, index int, header int) (*Table, error) {
 				indexNames[len(indexNames)-1][i] = row[i]
 			}
 
-			for i := index; i < cols; i++ {
-				rowData := make([]string, cols)
-
-				// for ci, colCell := range row {
-				// 	fmt.Print(colCell, "\t")
-				// }
-
-				data = append(data, rowData)
-			}
+			data = append(data, row[colStart:cols])
 
 		}
 	}
 
-	return nil, nil
+	ret := Table{Index: indexNames, Columns: columns, Data: data}
+
+	return &ret, nil
 }
