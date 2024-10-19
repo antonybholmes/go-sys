@@ -2,6 +2,7 @@ package sys
 
 import (
 	"bytes"
+	"fmt"
 
 	"github.com/rs/zerolog/log"
 	"github.com/xuri/excelize/v2"
@@ -13,8 +14,8 @@ type Table struct {
 	Data    [][]string `json:"data"`
 }
 
-func XlsxToText(input []byte, index int, header int) (*Table, error) {
-	r := bytes.NewReader(input)
+func XlsxToText(xlsx []byte, index int, header int) (*Table, error) {
+	r := bytes.NewReader(xlsx)
 
 	f, err := excelize.OpenReader(r) // .OpenFile("Book1.xlsx")
 
@@ -31,8 +32,17 @@ func XlsxToText(input []byte, index int, header int) (*Table, error) {
 		}
 	}()
 
+	sheets := f.GetSheetList()
+
+	if len(sheets) == 0 {
+		return nil, fmt.Errorf("no sheets")
+	}
+
+	// Always pick the first sheet
+	firstSheet := sheets[0]
+
 	// Get all the rows in the Sheet1.
-	rows, err := f.GetRows("Sheet1")
+	rows, err := f.GetRows(firstSheet)
 	if err != nil {
 
 		return nil, err
@@ -56,7 +66,6 @@ func XlsxToText(input []byte, index int, header int) (*Table, error) {
 	for ri, row := range rows {
 		if ri <= header {
 			for i := colStart; i < n; i++ {
-				log.Debug().Msgf("%d %d", i, i-colStart)
 				columns[i-colStart][ri] = row[i]
 			}
 		} else {
