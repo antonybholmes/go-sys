@@ -9,15 +9,15 @@ import (
 )
 
 type Table struct {
-	Index   [][]string `json:"index"`
-	Columns [][]string `json:"columns"`
-	Data    [][]string `json:"data"`
+	IndexName string     `json:"indexName"`
+	Index     [][]string `json:"index"`
+	Columns   [][]string `json:"columns"`
+	Data      [][]string `json:"data"`
 }
 
-func XlsxToText(xlsx []byte, index int, header int) (*Table, error) {
-	r := bytes.NewReader(xlsx)
+func XlsxSheetNames(reader *bytes.Reader) ([]string, error) {
 
-	f, err := excelize.OpenReader(r) // .OpenFile("Book1.xlsx")
+	f, err := excelize.OpenReader(reader) // .OpenFile("Book1.xlsx")
 
 	if err != nil {
 		return nil, err
@@ -32,55 +32,92 @@ func XlsxToText(xlsx []byte, index int, header int) (*Table, error) {
 		}
 	}()
 
+	// Always pick the first sheet
 	sheets := f.GetSheetList()
 
-	if len(sheets) == 0 {
-		return nil, fmt.Errorf("no sheets")
-	}
+	return sheets, nil
+}
 
-	// Always pick the first sheet
-	firstSheet := sheets[0]
+func XlsxToText(reader *bytes.Reader, sheet string, indexes int, headers int, skipRows int) (*Table, error) {
 
-	// Get all the rows in the Sheet1.
-	rows, err := f.GetRows(firstSheet)
+	f, err := excelize.OpenReader(reader) // .OpenFile("Book1.xlsx")
+
 	if err != nil {
-
 		return nil, err
 	}
 
-	n := len(rows[0])
-	colStart := max(index+1, 0)
-	//dataStart := max(header+1, 0)
-	cols := len(rows) - colStart
+	defer func() {
+		// Close the spreadsheet.
+		err := f.Close()
 
-	indexNames := make([][]string, 0, 100)
-	columns := make([][]string, cols)
-	data := make([][]string, 0, 100)
+		if err != nil {
+			log.Debug().Msgf("err closing xlsx: %s", err)
+		}
+	}()
 
-	for i := 0; i < cols; i++ {
-		columns[i] = make([]string, header+1)
+	// Always pick the first sheet
+
+	if sheet == "" {
+		sheet = f.GetSheetName(0)
 	}
 
-	//log.Debug().Msgf("hmm:%d %d %d %d", cols, len(rows), colStart, header)
+	if sheet == "" {
+		return nil, fmt.Errorf("no sheets")
+	}
+
+	// Get all the rows in the Sheet1.
+	rows, err := f.GetRows(sheet)
+
+	if err != nil {
+		return nil, err
+	}
+
+	headers = max(0, headers)
+	indexes = max(0, indexes)
+	skipRows = max(0, skipRows)
+
+	// rows we don't care about
+	rows = rows[skipRows:]
+
+	colStart := indexes
+	//dataStart := max(header+1, 0)
+
+	columns := make([][]string, headers)
+
+	for i := 0; i < headers; i++ {
+		columns[i] = rows[i][colStart:]
+	}
+
+	indexName := ""
+
+	if headers > 0 && indexes > 0 {
+		indexName = rows[headers-1][0]
+	}
+
+	// remove headers
+	rows = rows[headers:]
+	rowCount := len(rows)
+
+	log.Debug().Msgf("err closing xlsx: %d %d %d", len(rows), headers, indexes)
+
+	indexNames := make([][]string, indexes)
+	for i := 0; i < indexes; i++ {
+		indexNames[i] = make([]string, rowCount)
+	}
+
+	data := make([][]string, rowCount)
 
 	for ri, row := range rows {
-		if ri <= header {
-			for i := colStart; i < n; i++ {
-				columns[i-colStart][ri] = row[i]
-			}
-		} else {
-			indexNames = append(indexNames, make([]string, colStart))
 
-			for i := 0; i <= index; i++ {
-				indexNames[len(indexNames)-1][i] = row[i]
-			}
-
-			data = append(data, row[colStart:n])
-
+		for i := 0; i < indexes; i++ {
+			indexNames[i][ri] = row[i]
 		}
+
+		data[ri] = row[indexes:]
+
 	}
 
-	ret := Table{Index: indexNames, Columns: columns, Data: data}
+	ret := Table{IndexName: indexName, Index: indexNames, Columns: columns, Data: data}
 
 	return &ret, nil
 }
