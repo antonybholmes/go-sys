@@ -38,7 +38,7 @@ func XlsxSheetNames(reader *bytes.Reader) ([]string, error) {
 	return sheets, nil
 }
 
-func XlsxToText(reader *bytes.Reader, sheet string, indexes int, headers int, skipRows int) (*Table, error) {
+func XlsxToJson(reader *bytes.Reader, sheet string, indexes int, headers int, skipRows int) (*Table, error) {
 
 	f, err := excelize.OpenReader(reader) // .OpenFile("Book1.xlsx")
 
@@ -98,7 +98,7 @@ func XlsxToText(reader *bytes.Reader, sheet string, indexes int, headers int, sk
 	rows = rows[headers:]
 	rowCount := len(rows)
 
-	log.Debug().Msgf("err closing xlsx: %d %d %d", len(rows), headers, indexes)
+	//log.Debug().Msgf("xlsx: %d %d %d", len(rows), headers, indexes)
 
 	indexNames := make([][]string, indexes)
 	for i := 0; i < indexes; i++ {
