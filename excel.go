@@ -38,6 +38,7 @@ func XlsxSheetNames(reader *bytes.Reader) ([]string, error) {
 	return sheets, nil
 }
 
+// Convert the first sheet of an excel file into a json representation
 func XlsxToJson(reader *bytes.Reader, sheet string, indexes int, headers int, skipRows int) (*Table, error) {
 
 	f, err := excelize.OpenReader(reader) // .OpenFile("Book1.xlsx")
@@ -84,8 +85,8 @@ func XlsxToJson(reader *bytes.Reader, sheet string, indexes int, headers int, sk
 
 	columns := make([][]string, headers)
 
-	for i := 0; i < headers; i++ {
-		columns[i] = rows[i][colStart:]
+	for hi := 0; hi < headers; hi++ {
+		columns[hi] = rows[hi][colStart:]
 	}
 
 	indexName := ""
