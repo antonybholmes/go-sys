@@ -9,10 +9,10 @@ import (
 )
 
 type Table struct {
-	IndexName string     `json:"indexName"`
-	Index     [][]string `json:"index"`
-	Columns   [][]string `json:"columns"`
-	Data      [][]string `json:"data"`
+	IndexNames []string   `json:"indexNames"`
+	Index      [][]string `json:"index"`
+	Columns    [][]string `json:"columns"`
+	Data       [][]string `json:"data"`
 }
 
 func XlsxSheetNames(reader *bytes.Reader) ([]string, error) {
@@ -39,7 +39,11 @@ func XlsxSheetNames(reader *bytes.Reader) ([]string, error) {
 }
 
 // Convert the first sheet of an excel file into a json representation
-func XlsxToJson(reader *bytes.Reader, sheet string, indexes int, headers int, skipRows int) (*Table, error) {
+func XlsxToJson(reader *bytes.Reader,
+	sheet string,
+	indexes int,
+	headers int,
+	skipRows int) (*Table, error) {
 
 	f, err := excelize.OpenReader(reader) // .OpenFile("Book1.xlsx")
 
@@ -81,18 +85,26 @@ func XlsxToJson(reader *bytes.Reader, sheet string, indexes int, headers int, sk
 	rows = rows[skipRows:]
 
 	colStart := indexes
+	colCount := len(rows[0]) - colStart
+
 	//dataStart := max(header+1, 0)
 
-	columns := make([][]string, headers)
+	columns := make([][]string, 0, colCount)
 
-	for hi := 0; hi < headers; hi++ {
-		columns[hi] = rows[hi][colStart:]
+	if headers > 0 {
+		for c := range colCount {
+			columns = append(columns, make([]string, headers))
+
+			for r := range headers {
+				columns[c][r] = rows[r][colStart+c]
+			}
+		}
 	}
 
-	indexName := ""
+	indexNames := make([]string, 0, indexes)
 
 	if headers > 0 && indexes > 0 {
-		indexName = rows[headers-1][0]
+		indexNames = rows[headers-1][0:indexes]
 	}
 
 	// remove headers
@@ -101,24 +113,27 @@ func XlsxToJson(reader *bytes.Reader, sheet string, indexes int, headers int, sk
 
 	//log.Debug().Msgf("xlsx: %d %d %d", len(rows), headers, indexes)
 
-	indexNames := make([][]string, indexes)
-	for i := 0; i < indexes; i++ {
-		indexNames[i] = make([]string, rowCount)
-	}
+	indexData := make([][]string, 0, rowCount)
+
+	// for i := range rowCount {
+	// 	indexData[i] = make([]string, indexes)
+	// }
 
 	data := make([][]string, rowCount)
 
 	for ri, row := range rows {
-
-		for i := 0; i < indexes; i++ {
-			indexNames[i][ri] = row[i]
+		if indexes > 0 {
+			indexData = append(indexData, row[0:indexes])
 		}
 
 		data[ri] = row[indexes:]
-
 	}
 
-	ret := Table{IndexName: indexName, Index: indexNames, Columns: columns, Data: data}
+	ret := Table{
+		IndexNames: indexNames,
+		Index:      indexData,
+		Columns:    columns,
+		Data:       data}
 
 	return &ret, nil
 }
