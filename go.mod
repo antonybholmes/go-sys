@@ -1,6 +1,6 @@
 module github.com/antonybholmes/go-sys
 
-go 1.23.0
+go 1.24
 
 toolchain go1.24.0
 
@@ -11,6 +11,8 @@ require (
 )
 
 require (
+	github.com/google/uuid v1.6.0
+	github.com/matoous/go-nanoid/v2 v2.1.0
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mohae/deepcopy v0.0.0-20170929034955-c48cc78d4826 // indirect
