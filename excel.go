@@ -3,6 +3,7 @@ package sys
 import (
 	"bytes"
 	"fmt"
+	"strings"
 
 	"github.com/rs/zerolog/log"
 	"github.com/xuri/excelize/v2"
@@ -43,7 +44,8 @@ func XlsxToJson(reader *bytes.Reader,
 	sheet string,
 	indexes int,
 	headers int,
-	skipRows int) (*Table, error) {
+	skipRows int,
+	trimWhitespace bool) (*Table, error) {
 
 	f, err := excelize.OpenReader(reader) // .OpenFile("Book1.xlsx")
 
@@ -97,6 +99,10 @@ func XlsxToJson(reader *bytes.Reader,
 
 			for r := range headers {
 				columns[c][r] = rows[r][colStart+c]
+
+				if trimWhitespace {
+					columns[c][r] = strings.TrimSpace(columns[c][r])
+				}
 			}
 		}
 	}
