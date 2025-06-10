@@ -65,7 +65,7 @@ func (o OrNode) BuildSql(args *[]interface{}, clause ClauseFunc) string {
 	return "(" + o.Left.BuildSql(args, clause) + " OR " + o.Right.BuildSql(args, clause) + ")"
 }
 
-func isVariable(c rune) bool {
+func isVariableChar(c rune) bool {
 	return unicode.IsLetter(c) || unicode.IsDigit(c) || c == '-' || c == '_'
 }
 
@@ -174,6 +174,13 @@ func (p *Parser) parseFactor() Node {
 		return expr
 	}
 
+	exact := false
+
+	if ch == '=' {
+		p.next()
+		exact = true
+	}
+
 	// Handle quoted variable names
 	if ch == '"' {
 		p.next()
@@ -195,7 +202,7 @@ func (p *Parser) parseFactor() Node {
 	// Unquoted variable
 	start := p.pos
 
-	for isVariable(p.peek()) {
+	for isVariableChar(p.peek()) {
 		p.next()
 	}
 
@@ -205,7 +212,7 @@ func (p *Parser) parseFactor() Node {
 
 	name := strings.TrimSpace(p.input[start:p.pos])
 
-	return VarNode{Value: name}
+	return VarNode{Value: name, Exact: exact}
 }
 
 func SqlBoolQuery(query string, clause ClauseFunc) (string, []interface{}) {
