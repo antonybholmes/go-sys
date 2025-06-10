@@ -4,7 +4,55 @@ import (
 	"fmt"
 	"strings"
 	"unicode"
+
+	"github.com/rs/zerolog/log"
 )
+
+//var SPACES_REGEX = regexp.MustCompile(`\s+`)
+
+func normalizeImplicitAnd(input string) string {
+
+	var b strings.Builder
+	inQuotes := false
+	last := rune(0)
+
+	for i, ch := range input {
+		switch ch {
+		case '"':
+			// we write strings as in between quotes
+			inQuotes = !inQuotes
+			b.WriteRune(ch)
+		case ' ':
+			// we are in the middle of two words so add a + to indicate and
+			if !inQuotes && isWordChar(last) && isWordChar(peek(input, i+1)) {
+				b.WriteRune('+') // implicit AND
+			} else {
+				b.WriteRune(ch) // preserve space inside quotes
+			}
+		default:
+			b.WriteRune(ch)
+		}
+		if !unicode.IsSpace(ch) {
+			last = ch
+		}
+	}
+	return b.String()
+}
+
+func isVariableChar(c rune) bool {
+	return unicode.IsLetter(c) || unicode.IsDigit(c) || c == '-' || c == '_' || c == '^' || c == '$'
+}
+
+func isWordChar(c rune) bool {
+	return isVariableChar(c) || c == '(' || c == ')'
+}
+
+func peek(s string, i int) rune {
+	if i >= len(s) {
+		return 0
+	}
+	return rune(s[i])
+}
 
 // Node represents an expression tree node
 type Node interface {
@@ -14,8 +62,24 @@ type Node interface {
 
 // VarNode for variables like A, B, etc.
 type VarNode struct {
-	Value string
-	Exact bool
+	Value     string
+	MatchType MatchType
+}
+
+func makeVarNode(raw string) VarNode {
+
+	switch {
+	case strings.HasPrefix(raw, "=") && len(raw) > 1:
+		return VarNode{Value: raw[1:len(raw)], MatchType: Exact}
+	case strings.HasPrefix(raw, "^") && strings.HasSuffix(raw, "$") && len(raw) > 2:
+		return VarNode{Value: raw[1 : len(raw)-1], MatchType: Exact}
+	case strings.HasPrefix(raw, "^") && len(raw) > 1:
+		return VarNode{Value: raw[1:], MatchType: StartsWith}
+	case strings.HasSuffix(raw, "$") && len(raw) > 1:
+		return VarNode{Value: raw[:len(raw)-1], MatchType: EndsWith}
+	default:
+		return VarNode{Value: raw, MatchType: Contains}
+	}
 }
 
 func (v VarNode) Eval(vars map[string]bool) bool {
@@ -23,18 +87,22 @@ func (v VarNode) Eval(vars map[string]bool) bool {
 }
 
 func (v VarNode) BuildSql(args *[]interface{}, clause ClauseFunc) string {
-	if v.Exact {
+	switch v.MatchType {
+	case Exact:
 		*args = append(*args, v.Value)
-	} else {
+	case StartsWith:
+		*args = append(*args, v.Value+"%")
+	case EndsWith:
+		*args = append(*args, "%"+v.Value)
+	default:
 		*args = append(*args, "%"+v.Value+"%")
 	}
 
-	//log.Debug().Msgf("args %v", args)
-	//log.Debug().Msgf("args %v", tag)
+	log.Debug().Msgf("args %v", args)
 
 	placeholder := fmt.Sprintf("?%d", len(*args))
 	//tagClauses = append(tagClauses, fmt.Sprintf("(gex.gene_symbol LIKE %s OR gex.ensembl_id LIKE %s)", placeholder, placeholder))
-	return clause(placeholder, v.Exact)
+	return clause(placeholder, v.MatchType)
 }
 
 // AndNode for AND operations
@@ -63,10 +131,6 @@ func (o OrNode) Eval(vars map[string]bool) bool {
 
 func (o OrNode) BuildSql(args *[]interface{}, clause ClauseFunc) string {
 	return "(" + o.Left.BuildSql(args, clause) + " OR " + o.Right.BuildSql(args, clause) + ")"
-}
-
-func isVariableChar(c rune) bool {
-	return unicode.IsLetter(c) || unicode.IsDigit(c) || c == '-' || c == '_'
 }
 
 // Parser struct
@@ -102,35 +166,55 @@ func (p *Parser) skipWhitespace() {
 }
 
 // Entry point: parse expression with OR as lowest precedence
-func (p *Parser) ParseExpr() Node {
-	left := p.parseTerm()
+func (p *Parser) ParseExpr() (Node, error) {
+	left, err := p.parseTerm()
+
+	if err != nil {
+		return nil, err
+	}
+
 	for {
 		p.skipWhitespace()
 		if p.peek() == ',' {
 			p.next()
-			right := p.parseTerm()
+			right, err := p.parseTerm()
+
+			if err != nil {
+				return nil, err
+			}
+
 			left = OrNode{Left: left, Right: right}
 		} else {
 			break
 		}
 	}
-	return left
+	return left, nil
 }
 
 // Handle ANDs
-func (p *Parser) parseTerm() Node {
-	left := p.parseFactor()
+func (p *Parser) parseTerm() (Node, error) {
+	left, err := p.parseFactor()
+
+	if err != nil {
+		return nil, err
+	}
+
 	for {
 		p.skipWhitespace()
 		if p.peek() == '+' {
 			p.next()
-			right := p.parseFactor()
+			right, err := p.parseFactor()
+
+			if err != nil {
+				return nil, err
+			}
+
 			left = AndNode{Left: left, Right: right}
 		} else {
 			break
 		}
 	}
-	return left
+	return left, nil
 }
 
 // Parse variables and parentheses
@@ -160,25 +244,24 @@ func (p *Parser) parseTerm() Node {
 // 	return VarNode{Name: name}
 // }
 
-func (p *Parser) parseFactor() Node {
+func (p *Parser) parseFactor() (Node, error) {
 	p.skipWhitespace()
 	ch := p.peek()
 
 	if ch == '(' {
 		p.next()
-		expr := p.ParseExpr()
-		if p.peek() != ')' {
-			panic("missing closing parenthesis")
+		expr, err := p.ParseExpr()
+
+		if err != nil {
+			return nil, err
 		}
-		p.next()
-		return expr
-	}
 
-	exact := false
+		if p.peek() != ')' {
+			return nil, fmt.Errorf("missing closing parenthesis")
+		}
 
-	if ch == '=' {
 		p.next()
-		exact = true
+		return expr, nil
 	}
 
 	// Handle quoted variable names
@@ -191,12 +274,16 @@ func (p *Parser) parseFactor() Node {
 			}
 			p.next()
 		}
+
 		if p.peek() != '"' {
-			panic("unterminated quoted variable")
+			return nil, fmt.Errorf("unterminated quoted variable")
 		}
-		name := p.input[start:p.pos]
+
+		value := p.input[start:p.pos]
 		p.next() // consume closing quote
-		return VarNode{Value: name}
+
+		ret := makeVarNode(value)
+		return &ret, nil
 	}
 
 	// Unquoted variable
@@ -207,24 +294,37 @@ func (p *Parser) parseFactor() Node {
 	}
 
 	if start == p.pos {
-		panic("expected variable")
+		return nil, fmt.Errorf("expected variable")
 	}
 
-	name := strings.TrimSpace(p.input[start:p.pos])
-
-	return VarNode{Value: name, Exact: exact}
+	value := strings.TrimSpace(p.input[start:p.pos])
+	ret := makeVarNode(value)
+	return &ret, nil
 }
 
-func SqlBoolQuery(query string, clause ClauseFunc) (string, []interface{}) {
+type SqlBoolQueryResp struct {
+	Sql  string
+	Args []interface{}
+}
 
+func SqlBoolQuery(query string, clause ClauseFunc) (*SqlBoolQueryResp, error) {
+
+	// first normalize query to replace spaces with + to be treated as ands
+	query = normalizeImplicitAnd(query)
+
+	// required so that we can use it with sqlite params
 	args := make([]interface{}, 0, 20)
 
 	parser := NewParser(query)
-	tree := parser.ParseExpr()
+	tree, err := parser.ParseExpr()
+
+	if err != nil {
+		return nil, err
+	}
 
 	sql := tree.BuildSql(&args, clause)
 
-	return sql, args
+	return &SqlBoolQueryResp{Sql: sql, Args: args}, nil
 
 }
 

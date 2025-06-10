@@ -2,6 +2,7 @@ package sys
 
 import (
 	"encoding/base64"
+	"strings"
 	"unsafe"
 
 	"github.com/google/uuid"
@@ -61,4 +62,23 @@ func NanoId() string {
 func IsValidUUID(u string) bool {
 	_, err := uuid.Parse(u)
 	return err == nil
+}
+
+// Replace runs of spaces with a single space
+func NormalizeSpaces(s string) string {
+	var b strings.Builder
+	inSpace := false
+
+	for _, r := range s {
+		if r == ' ' || r == '\t' || r == '\n' {
+			if !inSpace {
+				b.WriteRune(' ')
+				inSpace = true
+			}
+		} else {
+			b.WriteRune(r)
+			inSpace = false
+		}
+	}
+	return b.String()
 }

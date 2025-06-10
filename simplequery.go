@@ -6,13 +6,20 @@ import (
 	"strings"
 )
 
-var ALLOWED_CHARS_REGEX = regexp.MustCompile(`[^a-zA-Z0-9,\+\ \=\"]+`)
-
-var SPACES_REGEX = regexp.MustCompile(`\s+`)
+var INVALID_CHARS_REGEX = regexp.MustCompile(`[^a-zA-Z0-9,\+\ \=\"\^\$]+`)
 
 var AND_TERM_REGEX = regexp.MustCompile(`(=)?"([^"]+)"|(=)?([^"+,\s]+)`)
 
-type ClauseFunc func(placeholder string, exact bool) string
+type MatchType int
+
+const (
+	Exact MatchType = iota
+	StartsWith
+	EndsWith
+	Contains
+)
+
+type ClauseFunc func(placeholder string, matchType MatchType) string
 
 type Term struct {
 	Value string
@@ -20,7 +27,7 @@ type Term struct {
 }
 
 func SanitizeQuery(input string) string {
-	return ALLOWED_CHARS_REGEX.ReplaceAllString(input, "")
+	return strings.TrimSpace(NormalizeSpaces(INVALID_CHARS_REGEX.ReplaceAllString(input, "")))
 }
 
 // Parses a query into blocks of and tags using
