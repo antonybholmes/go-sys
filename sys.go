@@ -48,8 +48,10 @@ func DecodeB64Uuid(id string) (*uuid.UUID, error) {
 	return &decID, nil
 }
 
+// Generates a 12 char random id, which can used as guid for
+// most purposes. It's good enough for Planetscale
+// https://planetscale.com/blog/why-we-chose-nanoids-for-planetscales-api
 func NanoId() string {
-	// good enough for Planetscale https://planetscale.com/blog/why-we-chose-nanoids-for-planetscales-api
 	id, err := gonanoid.Generate("0123456789abcdefghijklmnopqrstuvwxyz", 12)
 
 	if err != nil {
@@ -64,13 +66,13 @@ func IsValidUUID(u string) bool {
 	return err == nil
 }
 
-// Replace runs of spaces with a single space
+// Replace runs of spaces, tabs, newlines with a single space
 func NormalizeSpaces(s string) string {
 	var b strings.Builder
 	inSpace := false
 
 	for _, r := range s {
-		if r == ' ' || r == '\t' || r == '\n' {
+		if r == ' ' || r == '\t' || r == '\r' || r == '\n' {
 			if !inSpace {
 				b.WriteRune(' ')
 				inSpace = true
@@ -80,5 +82,6 @@ func NormalizeSpaces(s string) string {
 			inSpace = false
 		}
 	}
+
 	return b.String()
 }

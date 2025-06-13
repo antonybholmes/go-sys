@@ -10,7 +10,7 @@ var INVALID_CHARS_REGEX = regexp.MustCompile(`[^a-zA-Z0-9,\+\ \=\"\^\$]+`)
 
 var AND_TERM_REGEX = regexp.MustCompile(`(=)?"([^"]+)"|(=)?([^"+,\s]+)`)
 
-type MatchType int
+type MatchType uint
 
 const (
 	Exact MatchType = iota
@@ -19,7 +19,13 @@ const (
 	Contains
 )
 
-type ClauseFunc func(placeholder string, matchType MatchType) string
+// Given a placeholder and match type create the sql to
+// perform the actual match. Placeholder is the numerical
+// index from 1...n of the variable to insert into the sql
+// statement, therefore for sql systems that support ?1 type
+// variables you can use that, otherwise it can be ignored
+// and the generic '?' used.
+type SqlClauseFunc func(placeholder uint, matchType MatchType) string
 
 type Term struct {
 	Value string

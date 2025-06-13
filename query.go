@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"strings"
 	"unicode"
-
-	"github.com/rs/zerolog/log"
 )
 
 //var SPACES_REGEX = regexp.MustCompile(`\s+`)
@@ -19,11 +17,12 @@ func normalizeImplicitAnd(input string) string {
 	for i, ch := range input {
 		switch ch {
 		case '"':
-			// we write strings as in between quotes
+			// strings between quotes are used as is
 			inQuotes = !inQuotes
 			b.WriteRune(ch)
 		case ' ':
-			// we are in the middle of two words so add a + to indicate and
+			// we are in the middle of two words so add a + between them
+			// to indicate and
 			if !inQuotes && isWordChar(last) && isWordChar(peek(input, i+1)) {
 				b.WriteRune('+') // implicit AND
 			} else {
@@ -32,6 +31,7 @@ func normalizeImplicitAnd(input string) string {
 		default:
 			b.WriteRune(ch)
 		}
+
 		if !unicode.IsSpace(ch) {
 			last = ch
 		}
@@ -39,12 +39,12 @@ func normalizeImplicitAnd(input string) string {
 	return b.String()
 }
 
-func isVariableChar(c rune) bool {
-	return unicode.IsLetter(c) || unicode.IsDigit(c) || c == '-' || c == '_' || c == '^' || c == '$'
+func isSearchTermChar(c rune) bool {
+	return unicode.IsLetter(c) || unicode.IsDigit(c) || c == '-' || c == '_' || c == '=' || c == '^' || c == '$'
 }
 
 func isWordChar(c rune) bool {
-	return isVariableChar(c) || c == '(' || c == ')'
+	return isSearchTermChar(c) || c == '(' || c == ')'
 }
 
 func peek(s string, i int) rune {
@@ -56,8 +56,8 @@ func peek(s string, i int) rune {
 
 // Node represents an expression tree node
 type Node interface {
-	Eval(vars map[string]bool) bool
-	BuildSql(args *[]interface{}, clause ClauseFunc) string
+	//Eval(vars map[string]bool) bool
+	BuildSql(clause SqlClauseFunc, args *[]interface{}) string
 }
 
 // VarNode for variables like A, B, etc.
@@ -70,7 +70,7 @@ func makeVarNode(raw string) VarNode {
 
 	switch {
 	case strings.HasPrefix(raw, "=") && len(raw) > 1:
-		return VarNode{Value: raw[1:len(raw)], MatchType: Exact}
+		return VarNode{Value: raw[1:], MatchType: Exact}
 	case strings.HasPrefix(raw, "^") && strings.HasSuffix(raw, "$") && len(raw) > 2:
 		return VarNode{Value: raw[1 : len(raw)-1], MatchType: Exact}
 	case strings.HasPrefix(raw, "^") && len(raw) > 1:
@@ -82,11 +82,11 @@ func makeVarNode(raw string) VarNode {
 	}
 }
 
-func (v VarNode) Eval(vars map[string]bool) bool {
-	return vars[v.Value]
-}
+// func (v VarNode) Eval(vars map[string]bool) bool {
+// 	return vars[v.Value]
+// }
 
-func (v VarNode) BuildSql(args *[]interface{}, clause ClauseFunc) string {
+func (v VarNode) BuildSql(clause SqlClauseFunc, args *[]interface{}) string {
 	switch v.MatchType {
 	case Exact:
 		*args = append(*args, v.Value)
@@ -98,9 +98,9 @@ func (v VarNode) BuildSql(args *[]interface{}, clause ClauseFunc) string {
 		*args = append(*args, "%"+v.Value+"%")
 	}
 
-	log.Debug().Msgf("args %v", args)
+	//log.Debug().Msgf("args %v", args)
 
-	placeholder := fmt.Sprintf("?%d", len(*args))
+	placeholder := uint(len(*args)) //fmt.Sprintf("?%d", len(*args))
 	//tagClauses = append(tagClauses, fmt.Sprintf("(gex.gene_symbol LIKE %s OR gex.ensembl_id LIKE %s)", placeholder, placeholder))
 	return clause(placeholder, v.MatchType)
 }
@@ -111,12 +111,12 @@ type AndNode struct {
 	Right Node
 }
 
-func (a AndNode) Eval(vars map[string]bool) bool {
-	return a.Left.Eval(vars) && a.Right.Eval(vars)
-}
+// func (a AndNode) Eval(vars map[string]bool) bool {
+// 	return a.Left.Eval(vars) && a.Right.Eval(vars)
+// }
 
-func (a AndNode) BuildSql(args *[]interface{}, clause ClauseFunc) string {
-	return "(" + a.Left.BuildSql(args, clause) + " AND " + a.Right.BuildSql(args, clause) + ")"
+func (a AndNode) BuildSql(clause SqlClauseFunc, args *[]interface{}) string {
+	return "(" + a.Left.BuildSql(clause, args) + " AND " + a.Right.BuildSql(clause, args) + ")"
 }
 
 // OrNode for OR operations
@@ -125,12 +125,12 @@ type OrNode struct {
 	Right Node
 }
 
-func (o OrNode) Eval(vars map[string]bool) bool {
-	return o.Left.Eval(vars) || o.Right.Eval(vars)
-}
+// func (o OrNode) Eval(vars map[string]bool) bool {
+// 	return o.Left.Eval(vars) || o.Right.Eval(vars)
+// }
 
-func (o OrNode) BuildSql(args *[]interface{}, clause ClauseFunc) string {
-	return "(" + o.Left.BuildSql(args, clause) + " OR " + o.Right.BuildSql(args, clause) + ")"
+func (o OrNode) BuildSql(clause SqlClauseFunc, args *[]interface{}) string {
+	return "(" + o.Left.BuildSql(clause, args) + " OR " + o.Right.BuildSql(clause, args) + ")"
 }
 
 // Parser struct
@@ -289,7 +289,9 @@ func (p *Parser) parseFactor() (Node, error) {
 	// Unquoted variable
 	start := p.pos
 
-	for isVariableChar(p.peek()) {
+	// keep advancing until we reach the end of the
+	// search term
+	for isSearchTermChar(p.peek()) {
 		p.next()
 	}
 
@@ -307,7 +309,7 @@ type SqlBoolQueryResp struct {
 	Args []interface{}
 }
 
-func SqlBoolQuery(query string, clause ClauseFunc) (*SqlBoolQueryResp, error) {
+func SqlBoolQuery(query string, clause SqlClauseFunc) (*SqlBoolQueryResp, error) {
 
 	// first normalize query to replace spaces with + to be treated as ands
 	query = normalizeImplicitAnd(query)
@@ -322,7 +324,7 @@ func SqlBoolQuery(query string, clause ClauseFunc) (*SqlBoolQueryResp, error) {
 		return nil, err
 	}
 
-	sql := tree.BuildSql(&args, clause)
+	sql := tree.BuildSql(clause, &args)
 
 	return &SqlBoolQueryResp{Sql: sql, Args: args}, nil
 
