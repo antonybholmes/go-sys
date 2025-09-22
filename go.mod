@@ -8,7 +8,7 @@ require (
 	github.com/xuri/excelize/v2 v2.9.1
 )
 
-require github.com/tiendc/go-deepcopy v1.6.1 // indirect
+require github.com/tiendc/go-deepcopy v1.7.1 // indirect
 
 require (
 	github.com/google/uuid v1.6.0
