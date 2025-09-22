@@ -26,8 +26,13 @@ func Map[T, U any](ts []T, f func(T) U) []U {
 	return us
 }
 
-func Uuid() string {
-	return uuid.New().String() // strings.ReplaceAll(u1.String(), "-", ""), nil
+func Uuid() (string, error) {
+	u, err := uuid.NewV7()
+	if err != nil {
+		return "", err
+	}
+
+	return u.String(), nil
 }
 
 func B64Uuid() string {
