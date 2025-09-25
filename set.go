@@ -46,11 +46,11 @@ func (s *Set[T]) Keys() []T {
 }
 
 // Returns the insection of a map with another
-func (s *Set[T]) Intersect(s2 *Set[T]) *Set[T] {
+func (s *Set[T]) Intersect(values *Set[T]) *Set[T] {
 	ret := NewSet[T]()
 
 	for k := range s.items {
-		if s2.Has(k) {
+		if values.Has(k) {
 			ret.Add(k)
 		}
 	}
@@ -60,14 +60,14 @@ func (s *Set[T]) Intersect(s2 *Set[T]) *Set[T] {
 
 // Returns the union of a map with another. The
 // original sets are not modified.
-func (s *Set[T]) Union(s2 *Set[T]) *Set[T] {
+func (s *Set[T]) Union(values *Set[T]) *Set[T] {
 	ret := NewSet[T]()
 
 	for k := range s.items {
 		ret.Add(k)
 	}
 
-	for k := range s2.items {
+	for k := range values.items {
 		ret.Add(k)
 	}
 
@@ -96,9 +96,35 @@ func (s *Set[T]) ListContains(values []T) bool {
 	return slices.ContainsFunc(values, s.Has)
 }
 
-// Check if any the values in the s2 are in this set
-func (s *Set[T]) Contains(s2 *Set[T]) bool {
-	return s.ListContains(s2.Keys())
+// Returns a list of the values in the set that are also in the provided list
+func (s *Set[T]) WhichList(values []T) []T {
+	ret := make([]T, 0, len(values))
+
+	for _, v := range values {
+		if s.Has(v) {
+			ret = append(ret, v)
+		}
+	}
+
+	return ret
+}
+
+// Returns a list of the values in the set that are also in the provided list
+func (s *Set[T]) Which(values *Set[T]) []T {
+	ret := make([]T, 0, len(values.items))
+
+	for v := range values.items {
+		if s.Has(v) {
+			ret = append(ret, v)
+		}
+	}
+
+	return ret
+}
+
+// Check if any the values in the values are in this set
+func (s *Set[T]) Contains(values *Set[T]) bool {
+	return s.ListContains(values.Keys())
 }
 
 type StringSet struct {
@@ -137,11 +163,11 @@ func (s *StringSet) Remove(v string) *StringSet {
 	return s
 }
 
-func (s *StringSet) Intersect(s2 *StringSet) *StringSet {
+func (s *StringSet) Intersect(values *StringSet) *StringSet {
 	ret := NewStringSet()
 
 	for k := range s.items {
-		if s2.Has(k) {
+		if values.Has(k) {
 			ret.Add(k)
 		}
 	}
@@ -149,14 +175,14 @@ func (s *StringSet) Intersect(s2 *StringSet) *StringSet {
 	return ret
 }
 
-func (s *StringSet) Union(s2 *StringSet) *StringSet {
+func (s *StringSet) Union(values *StringSet) *StringSet {
 	ret := NewStringSet()
 
 	for k := range s.items {
 		ret.Add(k)
 	}
 
-	for k := range s2.items {
+	for k := range values.items {
 		ret.Add(k)
 	}
 
@@ -180,8 +206,12 @@ func (s *StringSet) ListUpdate(values []string) *StringSet {
 	return s
 }
 
-func (s *StringSet) Contains(s2 *StringSet) bool {
-	return s.Set.ListContains(s2.Keys())
+func (s *StringSet) Contains(values *StringSet) bool {
+	return s.Set.ListContains(values.Keys())
+}
+
+func (s *StringSet) Which(values *StringSet) []string {
+	return s.Set.WhichList(values.Keys())
 }
 
 // func StringSetSort(s *Set[string]) []string {
