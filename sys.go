@@ -18,6 +18,13 @@ func Must[T any](v T, err error) T {
 	return v
 }
 
+func BaseMust(err error) {
+	if err != nil {
+		panic(err)
+	}
+
+}
+
 func Map[T, U any](ts []T, f func(T) U) []U {
 	us := make([]U, len(ts))
 	for i := range ts {
