@@ -33,7 +33,7 @@ func Ls() {
 	sort.Strings(envs)
 
 	for _, e := range envs {
-		log.Info().Msgf("%s", e)
+		log.Debug().Msgf("%s", e)
 	}
 }
 
