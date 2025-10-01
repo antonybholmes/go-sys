@@ -3,6 +3,7 @@ package sys
 import (
 	"encoding/base64"
 	"strings"
+	"time"
 	"unsafe"
 
 	"github.com/google/uuid"
@@ -96,4 +97,11 @@ func NormalizeSpaces(s string) string {
 	}
 
 	return b.String()
+}
+
+func MinDuration(a, b time.Duration) time.Duration {
+	if a < b {
+		return a
+	}
+	return b
 }
