@@ -10,9 +10,12 @@ import (
 	gonanoid "github.com/matoous/go-nanoid/v2"
 )
 
-const Sqlite3DB = "sqlite3"
-const PostgresDB = "postgres"
-const MySQLDB = "mysql"
+const (
+	Sqlite3DB  = "sqlite3"
+	PostgresDB = "postgres"
+	MySQLDB    = "mysql"
+	BlankUUID  = "00000000-0000-0000-0000-000000000000"
+)
 
 // panics on error or returns value, similar to google's
 // must in uuid but this is generic
