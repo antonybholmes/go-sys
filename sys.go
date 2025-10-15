@@ -41,7 +41,7 @@ func Map[T, U any](ts []T, f func(T) U) []U {
 	return us
 }
 
-func Uuid() (string, error) {
+func Uuidv7() (string, error) {
 	u, err := uuid.NewV7()
 	if err != nil {
 		return "", err
