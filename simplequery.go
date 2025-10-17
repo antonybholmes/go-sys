@@ -13,10 +13,10 @@ var AND_TERM_REGEX = regexp.MustCompile(`(=)?"([^"]+)"|(=)?([^"+,\s]+)`)
 type MatchType uint
 
 const (
-	Exact MatchType = iota
-	StartsWith
-	EndsWith
-	Contains
+	MatchTypeExact MatchType = iota
+	MatchTypeStartsWith
+	MatchTypeEndsWith
+	MatchTypeContains
 )
 
 // Given a placeholder and match type create the sql to

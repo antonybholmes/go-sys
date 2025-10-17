@@ -57,7 +57,7 @@ func peek(s string, i int) rune {
 // Node represents an expression tree node
 type Node interface {
 	//Eval(vars map[string]bool) bool
-	BuildSql(clause SqlClauseFunc, args *[]interface{}) string
+	BuildSql(clause SqlClauseFunc, args *[]any) string
 }
 
 // VarNode for variables like A, B, etc.
@@ -66,19 +66,38 @@ type VarNode struct {
 	MatchType MatchType
 }
 
-func makeVarNode(raw string) VarNode {
+func makeVarNode(raw string) (*VarNode, error) {
+
+	if len(raw) == 0 {
+		return nil, fmt.Errorf("empty search term")
+	}
 
 	switch {
-	case strings.HasPrefix(raw, "=") && len(raw) > 1:
-		return VarNode{Value: raw[1:], MatchType: Exact}
-	case strings.HasPrefix(raw, "^") && strings.HasSuffix(raw, "$") && len(raw) > 2:
-		return VarNode{Value: raw[1 : len(raw)-1], MatchType: Exact}
-	case strings.HasPrefix(raw, "^") && len(raw) > 1:
-		return VarNode{Value: raw[1:], MatchType: StartsWith}
-	case strings.HasSuffix(raw, "$") && len(raw) > 1:
-		return VarNode{Value: raw[:len(raw)-1], MatchType: EndsWith}
+	case strings.HasPrefix(raw, "="):
+		if len(raw) == 1 {
+			return nil, fmt.Errorf("empty search term")
+		}
+		return &VarNode{Value: raw[1:], MatchType: MatchTypeExact}, nil
+	case strings.HasPrefix(raw, "^") && strings.HasSuffix(raw, "$"):
+		if len(raw) == 2 {
+			return nil, fmt.Errorf("empty search term")
+		}
+
+		return &VarNode{Value: raw[1 : len(raw)-1], MatchType: MatchTypeExact}, nil
+	case strings.HasPrefix(raw, "^"):
+		if len(raw) == 1 {
+			return nil, fmt.Errorf("empty search term")
+		}
+
+		return &VarNode{Value: raw[1:], MatchType: MatchTypeStartsWith}, nil
+	case strings.HasSuffix(raw, "$"):
+		if len(raw) == 1 {
+			return nil, fmt.Errorf("empty search term")
+		}
+
+		return &VarNode{Value: raw[:len(raw)-1], MatchType: MatchTypeEndsWith}, nil
 	default:
-		return VarNode{Value: raw, MatchType: Contains}
+		return &VarNode{Value: raw, MatchType: MatchTypeContains}, nil
 	}
 }
 
@@ -86,13 +105,13 @@ func makeVarNode(raw string) VarNode {
 // 	return vars[v.Value]
 // }
 
-func (v VarNode) BuildSql(clause SqlClauseFunc, args *[]interface{}) string {
+func (v VarNode) BuildSql(clause SqlClauseFunc, args *[]any) string {
 	switch v.MatchType {
-	case Exact:
+	case MatchTypeExact:
 		*args = append(*args, v.Value)
-	case StartsWith:
+	case MatchTypeStartsWith:
 		*args = append(*args, v.Value+"%")
-	case EndsWith:
+	case MatchTypeEndsWith:
 		*args = append(*args, "%"+v.Value)
 	default:
 		*args = append(*args, "%"+v.Value+"%")
@@ -111,25 +130,25 @@ type AndNode struct {
 	Right Node
 }
 
-// func (a AndNode) Eval(vars map[string]bool) bool {
-// 	return a.Left.Eval(vars) && a.Right.Eval(vars)
-// }
-
-func (a AndNode) BuildSql(clause SqlClauseFunc, args *[]interface{}) string {
-	return "(" + a.Left.BuildSql(clause, args) + " AND " + a.Right.BuildSql(clause, args) + ")"
-}
-
 // OrNode for OR operations
 type OrNode struct {
 	Left  Node
 	Right Node
 }
 
+// func (a AndNode) Eval(vars map[string]bool) bool {
+// 	return a.Left.Eval(vars) && a.Right.Eval(vars)
+// }
+
+func (a AndNode) BuildSql(clause SqlClauseFunc, args *[]any) string {
+	return "(" + a.Left.BuildSql(clause, args) + " AND " + a.Right.BuildSql(clause, args) + ")"
+}
+
 // func (o OrNode) Eval(vars map[string]bool) bool {
 // 	return o.Left.Eval(vars) || o.Right.Eval(vars)
 // }
 
-func (o OrNode) BuildSql(clause SqlClauseFunc, args *[]interface{}) string {
+func (o OrNode) BuildSql(clause SqlClauseFunc, args *[]any) string {
 	return "(" + o.Left.BuildSql(clause, args) + " OR " + o.Right.BuildSql(clause, args) + ")"
 }
 
@@ -166,18 +185,22 @@ func (p *Parser) skipWhitespace() {
 }
 
 // Entry point: parse expression with OR as lowest precedence
+// e.g. A + B, C would be (A AND B) OR C
 func (p *Parser) ParseExpr() (Node, error) {
-	left, err := p.parseTerm()
+	left, err := p.parseAndSubClause()
 
 	if err != nil {
 		return nil, err
 	}
 
+	// as we scan, if we see commas, we have ORs otherwise
+	// we assume the spaces between terms represent ANDs
 	for {
 		p.skipWhitespace()
+
 		if p.peek() == ',' {
 			p.next()
-			right, err := p.parseTerm()
+			right, err := p.parseAndSubClause()
 
 			if err != nil {
 				return nil, err
@@ -192,8 +215,8 @@ func (p *Parser) ParseExpr() (Node, error) {
 }
 
 // Handle ANDs
-func (p *Parser) parseTerm() (Node, error) {
-	left, err := p.parseFactor()
+func (p *Parser) parseAndSubClause() (Node, error) {
+	left, err := p.parseSearchTerm()
 
 	if err != nil {
 		return nil, err
@@ -203,7 +226,7 @@ func (p *Parser) parseTerm() (Node, error) {
 		p.skipWhitespace()
 		if p.peek() == '+' {
 			p.next()
-			right, err := p.parseFactor()
+			right, err := p.parseSearchTerm()
 
 			if err != nil {
 				return nil, err
@@ -244,10 +267,12 @@ func (p *Parser) parseTerm() (Node, error) {
 // 	return VarNode{Name: name}
 // }
 
-func (p *Parser) parseFactor() (Node, error) {
+func (p *Parser) parseSearchTerm() (Node, error) {
 	p.skipWhitespace()
 	ch := p.peek()
 
+	// if we see a '(', we have a sub-expression
+	// so we parse that recursively
 	if ch == '(' {
 		p.next()
 		expr, err := p.ParseExpr()
@@ -264,7 +289,8 @@ func (p *Parser) parseFactor() (Node, error) {
 		return expr, nil
 	}
 
-	// Handle quoted variable names
+	// if we see a quote, we have a quoted variable so
+	// parse until the closing quote as is an keep all chars
 	if ch == '"' {
 		p.next()
 		start := p.pos
@@ -282,31 +308,45 @@ func (p *Parser) parseFactor() (Node, error) {
 		value := p.input[start:p.pos]
 		p.next() // consume closing quote
 
-		ret := makeVarNode(value)
-		return &ret, nil
+		ret, err := makeVarNode(value)
+
+		if err != nil {
+			return nil, err
+		}
+
+		return ret, nil
 	}
 
 	// Unquoted variable
 	start := p.pos
 
 	// keep advancing until we reach the end of the
-	// search term
+	// search term i.e. a space or other expression char
 	for isSearchTermChar(p.peek()) {
 		p.next()
 	}
 
+	// if we did not advance, it's an error
 	if start == p.pos {
 		return nil, fmt.Errorf("expected variable")
 	}
 
+	// extract the variable value sans spaces
 	value := strings.TrimSpace(p.input[start:p.pos])
-	ret := makeVarNode(value)
-	return &ret, nil
+
+	// make it into a VarNode which also determines the match type
+	ret, err := makeVarNode(value)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return ret, nil
 }
 
 type SqlBoolQueryResp struct {
 	Sql  string
-	Args []interface{}
+	Args []any
 }
 
 func SqlBoolQuery(query string, clause SqlClauseFunc) (*SqlBoolQueryResp, error) {
@@ -315,7 +355,7 @@ func SqlBoolQuery(query string, clause SqlClauseFunc) (*SqlBoolQueryResp, error)
 	query = normalizeImplicitAnd(query)
 
 	// required so that we can use it with sqlite params
-	args := make([]interface{}, 0, 20)
+	args := make([]any, 0, 20)
 
 	parser := NewParser(query)
 	tree, err := parser.ParseExpr()
