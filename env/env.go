@@ -6,8 +6,8 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/antonybholmes/go-sys/log"
 	"github.com/joho/godotenv"
-	"github.com/rs/zerolog/log"
 )
 
 func init() {
