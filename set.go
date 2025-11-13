@@ -153,66 +153,66 @@ func (s *StringSet) Keys() []string {
 	return keys
 }
 
-func (s *StringSet) Add(v string) *StringSet {
-	s.items[v] = struct{}{}
-	return s
-}
+// func (s *StringSet) Add(v string) *StringSet {
+// 	s.items[v] = struct{}{}
+// 	return s
+// }
 
-func (s *StringSet) Remove(v string) *StringSet {
-	delete(s.items, v)
-	return s
-}
+// func (s *StringSet) Remove(v string) *StringSet {
+// 	delete(s.items, v)
+// 	return s
+// }
 
-func (s *StringSet) Intersect(values *StringSet) *StringSet {
-	ret := NewStringSet()
+// func (s *StringSet) Intersect(values *StringSet) *StringSet {
+// 	ret := NewStringSet()
 
-	for k := range s.items {
-		if values.Has(k) {
-			ret.Add(k)
-		}
-	}
+// 	for k := range s.items {
+// 		if values.Has(k) {
+// 			ret.Add(k)
+// 		}
+// 	}
 
-	return ret
-}
+// 	return ret
+// }
 
-func (s *StringSet) Union(values *StringSet) *StringSet {
-	ret := NewStringSet()
+// func (s *StringSet) Union(values *StringSet) *StringSet {
+// 	ret := NewStringSet()
 
-	for k := range s.items {
-		ret.Add(k)
-	}
+// 	for k := range s.items {
+// 		ret.Add(k)
+// 	}
 
-	for k := range values.items {
-		ret.Add(k)
-	}
+// 	for k := range values.items {
+// 		ret.Add(k)
+// 	}
 
-	return ret
-}
+// 	return ret
+// }
 
-func (s *StringSet) Update(values *StringSet) *StringSet {
-	for v := range values.items {
-		s.Add(v)
-	}
+// func (s *StringSet) Update(values *StringSet) *StringSet {
+// 	for v := range values.items {
+// 		s.Add(v)
+// 	}
 
-	return s
-}
+// 	return s
+// }
 
 // Add values from a list to the set and returns a
 // pointer to the updated set. Suitable for chaining.
-func (s *StringSet) ListUpdate(values []string) *StringSet {
-	// so we don't infinite loop
-	s.Set.ListUpdate(values)
+// func (s *StringSet) ListUpdate(values []string) *StringSet {
+// 	// so we don't infinite loop
+// 	s.Set.ListUpdate(values)
 
-	return s
-}
+// 	return s
+// }
 
-func (s *StringSet) Contains(values *StringSet) bool {
-	return s.Set.ListContains(values.Keys())
-}
+// func (s *StringSet) Contains(values *StringSet) bool {
+// 	return s.Set.ListContains(values.Keys())
+// }
 
-func (s *StringSet) Which(values *StringSet) []string {
-	return s.Set.WhichList(values.Keys())
-}
+// func (s *StringSet) Which(values *StringSet) []string {
+// 	return s.Set.WhichList(values.Keys())
+// }
 
 // func StringSetSort(s *Set[string]) []string {
 
