@@ -119,7 +119,7 @@ func (v VarNode) BuildSql(clause SqlClauseFunc, args *[]any) string {
 
 	//log.Debug().Msgf("args %v", args)
 
-	placeholder := uint(len(*args)) //fmt.Sprintf("?%d", len(*args))
+	placeholder := len(*args) //fmt.Sprintf("?%d", len(*args))
 	//tagClauses = append(tagClauses, fmt.Sprintf("(gex.gene_symbol LIKE %s OR gex.ensembl_id LIKE %s)", placeholder, placeholder))
 	return clause(placeholder, v.MatchType)
 }

@@ -2,6 +2,7 @@ package sys
 
 import (
 	"encoding/base64"
+	"strconv"
 	"strings"
 	"time"
 	"unsafe"
@@ -111,4 +112,9 @@ func MinDuration(a, b time.Duration) time.Duration {
 		return a
 	}
 	return b
+}
+
+// Atoi converts a string to int, ignoring commas
+func Atoi(s string) (int, error) {
+	return strconv.Atoi(strings.ReplaceAll(s, ",", ""))
 }

@@ -6,7 +6,7 @@ import (
 )
 
 func TestAdd(t *testing.T) {
-	resp, _ := SqlBoolQuery("A+B,=C+(D+E)", func(placeholder uint, matchType MatchType) string {
+	resp, _ := SqlBoolQuery("A+B,=C+(D+E)", func(placeholder int, matchType MatchType) string {
 
 		// if exact {
 		// 	return "(gex.gene_symbol = ? OR gex.ensembl_id = ?)"

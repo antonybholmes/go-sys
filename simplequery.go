@@ -25,7 +25,7 @@ const (
 // statement, therefore for sql systems that support ?1 type
 // variables you can use that, otherwise it can be ignored
 // and the generic '?' used.
-type SqlClauseFunc func(placeholder uint, matchType MatchType) string
+type SqlClauseFunc func(placeholder int, matchType MatchType) string
 
 type Term struct {
 	Value string
