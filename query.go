@@ -1,7 +1,7 @@
 package sys
 
 import (
-	"fmt"
+	"errors"
 	"strings"
 	"unicode"
 )
@@ -69,30 +69,30 @@ type VarNode struct {
 func makeVarNode(raw string) (*VarNode, error) {
 
 	if len(raw) == 0 {
-		return nil, fmt.Errorf("empty search term")
+		return nil, errors.New("empty search term")
 	}
 
 	switch {
 	case strings.HasPrefix(raw, "="):
 		if len(raw) == 1 {
-			return nil, fmt.Errorf("empty search term")
+			return nil, errors.New("empty search term")
 		}
 		return &VarNode{Value: raw[1:], MatchType: MatchTypeExact}, nil
 	case strings.HasPrefix(raw, "^") && strings.HasSuffix(raw, "$"):
 		if len(raw) == 2 {
-			return nil, fmt.Errorf("empty search term")
+			return nil, errors.New("empty search term")
 		}
 
 		return &VarNode{Value: raw[1 : len(raw)-1], MatchType: MatchTypeExact}, nil
 	case strings.HasPrefix(raw, "^"):
 		if len(raw) == 1 {
-			return nil, fmt.Errorf("empty search term")
+			return nil, errors.New("empty search term")
 		}
 
 		return &VarNode{Value: raw[1:], MatchType: MatchTypeStartsWith}, nil
 	case strings.HasSuffix(raw, "$"):
 		if len(raw) == 1 {
-			return nil, fmt.Errorf("empty search term")
+			return nil, errors.New("empty search term")
 		}
 
 		return &VarNode{Value: raw[:len(raw)-1], MatchType: MatchTypeEndsWith}, nil
@@ -282,7 +282,7 @@ func (p *Parser) parseSearchTerm() (Node, error) {
 		}
 
 		if p.peek() != ')' {
-			return nil, fmt.Errorf("missing closing parenthesis")
+			return nil, errors.New("missing closing parenthesis")
 		}
 
 		p.next()
@@ -302,7 +302,7 @@ func (p *Parser) parseSearchTerm() (Node, error) {
 		}
 
 		if p.peek() != '"' {
-			return nil, fmt.Errorf("unterminated quoted variable")
+			return nil, errors.New("unterminated quoted variable")
 		}
 
 		value := p.input[start:p.pos]
@@ -328,7 +328,7 @@ func (p *Parser) parseSearchTerm() (Node, error) {
 
 	// if we did not advance, it's an error
 	if start == p.pos {
-		return nil, fmt.Errorf("expected variable")
+		return nil, errors.New("expected variable")
 	}
 
 	// extract the variable value sans spaces

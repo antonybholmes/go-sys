@@ -2,7 +2,7 @@ package sys
 
 import (
 	"bytes"
-	"fmt"
+	"errors"
 	"strings"
 
 	"github.com/antonybholmes/go-sys/log"
@@ -69,7 +69,7 @@ func XlsxToJson(reader *bytes.Reader,
 	}
 
 	if sheet == "" {
-		return nil, fmt.Errorf("no sheets")
+		return nil, errors.New("no sheets")
 	}
 
 	// Get all the rows in the Sheet1.
