@@ -6,7 +6,37 @@ import (
 	"unicode"
 )
 
-//var SPACES_REGEX = regexp.MustCompile(`\s+`)
+// Node represents an expression tree node
+type (
+	Node interface {
+		//Eval(vars map[string]bool) bool
+		BuildSql(clause SqlClauseFunc, args *[]any) string
+	}
+
+	// VarNode for variables like A, B, etc.
+	VarNode struct {
+		Value     string
+		MatchType MatchType
+	}
+
+	// AndNode for AND operations
+	AndNode struct {
+		Left  Node
+		Right Node
+	}
+
+	// OrNode for OR operations
+	OrNode struct {
+		Left  Node
+		Right Node
+	}
+
+	// Parser struct
+	Parser struct {
+		input string
+		pos   int
+	}
+)
 
 func normalizeImplicitAnd(input string) string {
 
@@ -52,18 +82,6 @@ func peek(s string, i int) rune {
 		return 0
 	}
 	return rune(s[i])
-}
-
-// Node represents an expression tree node
-type Node interface {
-	//Eval(vars map[string]bool) bool
-	BuildSql(clause SqlClauseFunc, args *[]any) string
-}
-
-// VarNode for variables like A, B, etc.
-type VarNode struct {
-	Value     string
-	MatchType MatchType
 }
 
 func makeVarNode(raw string) (*VarNode, error) {
@@ -124,18 +142,6 @@ func (v VarNode) BuildSql(clause SqlClauseFunc, args *[]any) string {
 	return clause(placeholder, v.MatchType)
 }
 
-// AndNode for AND operations
-type AndNode struct {
-	Left  Node
-	Right Node
-}
-
-// OrNode for OR operations
-type OrNode struct {
-	Left  Node
-	Right Node
-}
-
 // func (a AndNode) Eval(vars map[string]bool) bool {
 // 	return a.Left.Eval(vars) && a.Right.Eval(vars)
 // }
@@ -150,12 +156,6 @@ func (a AndNode) BuildSql(clause SqlClauseFunc, args *[]any) string {
 
 func (o OrNode) BuildSql(clause SqlClauseFunc, args *[]any) string {
 	return "(" + o.Left.BuildSql(clause, args) + " OR " + o.Right.BuildSql(clause, args) + ")"
-}
-
-// Parser struct
-type Parser struct {
-	input string
-	pos   int
 }
 
 func NewParser(input string) *Parser {

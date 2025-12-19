@@ -6,11 +6,22 @@ import (
 	"strings"
 )
 
-var INVALID_CHARS_REGEX = regexp.MustCompile(`[^a-zA-Z0-9,\+\ \=\"\^\$]+`)
+type (
+	MatchType int
 
-var AND_TERM_REGEX = regexp.MustCompile(`(=)?"([^"]+)"|(=)?([^"+,\s]+)`)
+	// Given a placeholder and match type create the sql to
+	// perform the actual match. Placeholder is the numerical
+	// index from 1...n of the variable to insert into the sql
+	// statement, therefore for sql systems that support ?1 type
+	// variables you can use that, otherwise it can be ignored
+	// and the generic '?' used.
+	SqlClauseFunc func(placeholder int, matchType MatchType) string
 
-type MatchType uint
+	Term struct {
+		Value string
+		Exact bool
+	}
+)
 
 const (
 	MatchTypeExact MatchType = iota
@@ -19,21 +30,14 @@ const (
 	MatchTypeContains
 )
 
-// Given a placeholder and match type create the sql to
-// perform the actual match. Placeholder is the numerical
-// index from 1...n of the variable to insert into the sql
-// statement, therefore for sql systems that support ?1 type
-// variables you can use that, otherwise it can be ignored
-// and the generic '?' used.
-type SqlClauseFunc func(placeholder int, matchType MatchType) string
+var (
+	InvalidCharsRegex = regexp.MustCompile(`[^a-zA-Z0-9,\+\ \=\"\^\$]+`)
 
-type Term struct {
-	Value string
-	Exact bool
-}
+	AndTermRegex = regexp.MustCompile(`(=)?"([^"]+)"|(=)?([^"+,\s]+)`)
+)
 
 func SanitizeQuery(input string) string {
-	return strings.TrimSpace(NormalizeSpaces(INVALID_CHARS_REGEX.ReplaceAllString(input, "")))
+	return strings.TrimSpace(NormalizeSpaces(InvalidCharsRegex.ReplaceAllString(input, "")))
 }
 
 // Parses a query into blocks of and tags using
@@ -53,7 +57,7 @@ func ParseQuery(query string) (orTags []string, terms [][]*Term) {
 
 		andTerms := make([]*Term, 0, len(orGroups))
 
-		parts := AND_TERM_REGEX.FindAllStringSubmatch(group, -1)
+		parts := AndTermRegex.FindAllStringSubmatch(group, -1)
 		for _, m := range parts {
 			exact := m[1] == "=" || m[3] == "="
 
