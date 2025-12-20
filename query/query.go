@@ -2,8 +2,11 @@ package query
 
 import (
 	"errors"
+
 	"strings"
 	"unicode"
+
+	"github.com/antonybholmes/go-sys/log"
 )
 
 // Node represents an expression tree node
@@ -45,36 +48,71 @@ func normalizeImplicitAnd(input string) string {
 	inQuotes := false
 	last := rune(0)
 
-	for i, ch := range input {
+	for i := 0; i < len(input); {
+		ch := rune(input[i])
+
 		switch ch {
 		case '"':
 			// strings between quotes are used as is
 			inQuotes = !inQuotes
 			b.WriteRune(ch)
+			i++
 		case ' ':
-			// we are in the middle of two words so add a + between them
-			// to indicate and
+			if inQuotes {
+				// preserve spaces exactly inside quotes
+				b.WriteRune(ch)
+				i++
+				continue
+			}
 
-			if !inQuotes && isWordChar(last) && isWordChar(peek(input, i+1)) {
+			// consume run of spaces
+			j := i
+			for j < len(input) && input[j] == ' ' {
+				j++
+			}
+
+			// this will be the character after the spaces
+			next := rune(0)
+			if j < len(input) {
+				next = rune(input[j])
+			}
+
+			if isWordChar(last) && isWordChar(next) {
 				b.WriteRune('+') // implicit AND
-			} else {
-				// if in quotes always add, or if not in quotes but not between words ignore
-				// e.g. multiple spaces or space next to comma or plus
-				b.WriteRune(ch) // preserve space inside quotes
+				last = '+'
+			}
+
+			// skip all spaces
+			i = j
+		case '+', ',', '(':
+			if inQuotes {
+				// preserve spaces exactly inside quotes
+				b.WriteRune(ch)
+				i++
+				continue
+			}
+
+			b.WriteRune(ch)
+			last = ch
+			i++
+
+			// consume run of spaces
+			for i < len(input) && input[i] == ' ' {
+				i++
 			}
 		default:
 			b.WriteRune(ch)
+			last = ch
+			i++
 		}
 
-		if !unicode.IsSpace(ch) {
-			last = ch
-		}
 	}
+
 	return b.String()
 }
 
 func isSearchTermChar(c rune) bool {
-	return unicode.IsLetter(c) || unicode.IsDigit(c) || c == '-' || c == '_' || c == '=' || c == '^' || c == '$'
+	return unicode.IsLetter(c) || unicode.IsDigit(c) || c == '-' || c == '_' || c == '=' || c == '^' || c == '$' || c == '.'
 }
 
 func isWordChar(c rune) bool {
@@ -94,7 +132,7 @@ func makeSearchNode(raw string) (*SearchNode, error) {
 		return nil, errors.New("empty search term")
 	}
 
-	ret := SearchNode{Value: "", MatchType: MatchTypeExact, Not: false}
+	ret := SearchNode{Value: "", MatchType: MatchTypeStartsWith, Not: false}
 
 	if strings.HasPrefix(raw, "-") {
 		ret.Not = true
@@ -140,7 +178,7 @@ func makeSearchNode(raw string) (*SearchNode, error) {
 
 	default:
 		ret.Value = raw
-		ret.MatchType = MatchTypeContains
+		ret.MatchType = MatchTypeStartsWith
 	}
 
 	return &ret, nil
@@ -387,6 +425,8 @@ func SqlBoolTree(query string) (Node, error) {
 
 	// first normalize query to replace spaces with + to be treated as ands
 	query = normalizeImplicitAnd(query)
+
+	log.Debug().Msgf("normalized query: %s", query)
 
 	parser := NewParser(query)
 

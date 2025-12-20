@@ -33,7 +33,10 @@ const (
 )
 
 var (
-	InvalidCharsRegex = regexp.MustCompile(`[^a-zA-Z0-9,\+\ \=\"\^\$]+`)
+	// matches any invalid characters for stripping out of queries,
+	// not we allow parentheses for simple boolean query building if
+	// desired
+	InvalidCharsRegex = regexp.MustCompile(`[^a-zA-Z0-9,\+\ \=\"\^\$\(\)\.\-]+`)
 
 	AndTermRegex = regexp.MustCompile(`(=)?"([^"]+)"|(=)?([^"+,\s]+)`)
 )
