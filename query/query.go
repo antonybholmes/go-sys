@@ -85,16 +85,16 @@ func normalizeImplicitAnd(input string) string {
 			// skip all spaces
 			i = j
 		case '+', ',', '(':
+			b.WriteRune(ch)
+			i++
+
 			if inQuotes {
 				// preserve spaces exactly inside quotes
-				b.WriteRune(ch)
-				i++
 				continue
 			}
 
-			b.WriteRune(ch)
+			// the last non-space character we've seen
 			last = ch
-			i++
 
 			// consume run of spaces
 			for i < len(input) && input[i] == ' ' {
@@ -132,7 +132,7 @@ func makeSearchNode(raw string) (*SearchNode, error) {
 		return nil, errors.New("empty search term")
 	}
 
-	ret := SearchNode{Value: "", MatchType: MatchTypeStartsWith, Not: false}
+	ret := SearchNode{Value: "", MatchType: MatchTypeContains, Not: false}
 
 	if strings.HasPrefix(raw, "-") {
 		ret.Not = true
@@ -177,8 +177,10 @@ func makeSearchNode(raw string) (*SearchNode, error) {
 		ret.MatchType = MatchTypeEndsWith
 
 	default:
+		// default to starts with search since
+		// it's the most useful for gene symbols etc.
 		ret.Value = raw
-		ret.MatchType = MatchTypeStartsWith
+		//ret.MatchType = MatchTypeStartsWith
 	}
 
 	return &ret, nil
