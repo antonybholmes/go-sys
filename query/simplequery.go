@@ -1,9 +1,11 @@
-package sys
+package query
 
 import (
 	"fmt"
 	"regexp"
 	"strings"
+
+	"github.com/antonybholmes/go-sys"
 )
 
 type (
@@ -15,7 +17,7 @@ type (
 	// statement, therefore for sql systems that support ?1 type
 	// variables you can use that, otherwise it can be ignored
 	// and the generic '?' used.
-	SqlClauseFunc func(placeholder int, matchType MatchType) string
+	SqlClauseFunc func(placeholderIndex int, matchType MatchType, not bool) string
 
 	Term struct {
 		Value string
@@ -37,7 +39,7 @@ var (
 )
 
 func SanitizeQuery(input string) string {
-	return strings.TrimSpace(NormalizeSpaces(InvalidCharsRegex.ReplaceAllString(input, "")))
+	return strings.TrimSpace(sys.NormalizeSpaces(InvalidCharsRegex.ReplaceAllString(input, "")))
 }
 
 // Parses a query into blocks of and tags using

@@ -1,4 +1,4 @@
-package sys
+package query
 
 import (
 	"fmt"

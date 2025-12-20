@@ -1,4 +1,4 @@
-package sys
+package query
 
 import (
 	"errors"
@@ -13,10 +13,11 @@ type (
 		BuildSql(clause SqlClauseFunc, args *[]any) string
 	}
 
-	// VarNode for variables like A, B, etc.
-	VarNode struct {
+	// SearchNode for variables like A, B, etc.
+	SearchNode struct {
 		Value     string
 		MatchType MatchType
+		Not       bool
 	}
 
 	// AndNode for AND operations
@@ -53,9 +54,12 @@ func normalizeImplicitAnd(input string) string {
 		case ' ':
 			// we are in the middle of two words so add a + between them
 			// to indicate and
+
 			if !inQuotes && isWordChar(last) && isWordChar(peek(input, i+1)) {
 				b.WriteRune('+') // implicit AND
 			} else {
+				// if in quotes always add, or if not in quotes but not between words ignore
+				// e.g. multiple spaces or space next to comma or plus
 				b.WriteRune(ch) // preserve space inside quotes
 			}
 		default:
@@ -84,10 +88,21 @@ func peek(s string, i int) rune {
 	return rune(s[i])
 }
 
-func makeVarNode(raw string) (*VarNode, error) {
+func makeSearchNode(raw string) (*SearchNode, error) {
 
 	if len(raw) == 0 {
 		return nil, errors.New("empty search term")
+	}
+
+	ret := SearchNode{Value: "", MatchType: MatchTypeExact, Not: false}
+
+	if strings.HasPrefix(raw, "-") {
+		ret.Not = true
+		raw = raw[1:]
+
+		if len(raw) == 0 {
+			return nil, errors.New("empty search term")
+		}
 	}
 
 	switch {
@@ -95,35 +110,47 @@ func makeVarNode(raw string) (*VarNode, error) {
 		if len(raw) == 1 {
 			return nil, errors.New("empty search term")
 		}
-		return &VarNode{Value: raw[1:], MatchType: MatchTypeExact}, nil
+
+		ret.Value = raw[1:]
+		ret.MatchType = MatchTypeExact
+
 	case strings.HasPrefix(raw, "^") && strings.HasSuffix(raw, "$"):
 		if len(raw) == 2 {
 			return nil, errors.New("empty search term")
 		}
 
-		return &VarNode{Value: raw[1 : len(raw)-1], MatchType: MatchTypeExact}, nil
+		ret.Value = raw[1 : len(raw)-1]
+		ret.MatchType = MatchTypeExact
+
 	case strings.HasPrefix(raw, "^"):
 		if len(raw) == 1 {
 			return nil, errors.New("empty search term")
 		}
 
-		return &VarNode{Value: raw[1:], MatchType: MatchTypeStartsWith}, nil
+		ret.Value = raw[1:]
+		ret.MatchType = MatchTypeStartsWith
+
 	case strings.HasSuffix(raw, "$"):
 		if len(raw) == 1 {
 			return nil, errors.New("empty search term")
 		}
 
-		return &VarNode{Value: raw[:len(raw)-1], MatchType: MatchTypeEndsWith}, nil
+		ret.Value = raw[:len(raw)-1]
+		ret.MatchType = MatchTypeEndsWith
+
 	default:
-		return &VarNode{Value: raw, MatchType: MatchTypeContains}, nil
+		ret.Value = raw
+		ret.MatchType = MatchTypeContains
 	}
+
+	return &ret, nil
 }
 
 // func (v VarNode) Eval(vars map[string]bool) bool {
 // 	return vars[v.Value]
 // }
 
-func (v VarNode) BuildSql(clause SqlClauseFunc, args *[]any) string {
+func (v SearchNode) BuildSql(clause SqlClauseFunc, args *[]any) string {
 	switch v.MatchType {
 	case MatchTypeExact:
 		*args = append(*args, v.Value)
@@ -137,9 +164,9 @@ func (v VarNode) BuildSql(clause SqlClauseFunc, args *[]any) string {
 
 	//log.Debug().Msgf("args %v", args)
 
-	placeholder := len(*args) //fmt.Sprintf("?%d", len(*args))
+	placeholderIndex := len(*args) //fmt.Sprintf("?%d", len(*args))
 	//tagClauses = append(tagClauses, fmt.Sprintf("(gex.gene_symbol LIKE %s OR gex.ensembl_id LIKE %s)", placeholder, placeholder))
-	return clause(placeholder, v.MatchType)
+	return clause(placeholderIndex, v.MatchType, v.Not)
 }
 
 // func (a AndNode) Eval(vars map[string]bool) bool {
@@ -178,6 +205,8 @@ func (p *Parser) next() rune {
 	return ch
 }
 
+// Skip whitespace characters to trim
+// input so tokens cannot have leading/trailing spaces
 func (p *Parser) skipWhitespace() {
 	for unicode.IsSpace(p.peek()) {
 		p.next()
@@ -237,6 +266,7 @@ func (p *Parser) parseAndSubClause() (Node, error) {
 			break
 		}
 	}
+
 	return left, nil
 }
 
@@ -295,6 +325,8 @@ func (p *Parser) parseSearchTerm() (Node, error) {
 		p.next()
 		start := p.pos
 		for {
+			// we want to keep all chars until we see the closing quote
+			// or the end of the input
 			if p.peek() == '"' || p.peek() == 0 {
 				break
 			}
@@ -306,9 +338,11 @@ func (p *Parser) parseSearchTerm() (Node, error) {
 		}
 
 		value := p.input[start:p.pos]
-		p.next() // consume closing quote
 
-		ret, err := makeVarNode(value)
+		// consume closing quote
+		p.next()
+
+		ret, err := makeSearchNode(value)
 
 		if err != nil {
 			return nil, err
@@ -331,11 +365,11 @@ func (p *Parser) parseSearchTerm() (Node, error) {
 		return nil, errors.New("expected variable")
 	}
 
-	// extract the variable value sans spaces
+	// extract the token without leading/trailing spaces
 	value := strings.TrimSpace(p.input[start:p.pos])
 
-	// make it into a VarNode which also determines the match type
-	ret, err := makeVarNode(value)
+	// make it into a SearchNode which also determines the match type
+	ret, err := makeSearchNode(value)
 
 	if err != nil {
 		return nil, err
@@ -349,21 +383,53 @@ type SqlBoolQueryResp struct {
 	Args []any
 }
 
-func SqlBoolQuery(query string, clause SqlClauseFunc) (*SqlBoolQueryResp, error) {
+func SqlBoolTree(query string) (Node, error) {
 
 	// first normalize query to replace spaces with + to be treated as ands
 	query = normalizeImplicitAnd(query)
 
-	// required so that we can use it with sqlite params
-	args := make([]any, 0, 20)
-
 	parser := NewParser(query)
+
+	// create the expression tree
 	tree, err := parser.ParseExpr()
 
 	if err != nil {
 		return nil, err
 	}
 
+	return tree, nil
+}
+
+func SqlBoolQueryFromTree(tree Node, clause SqlClauseFunc) (*SqlBoolQueryResp, error) {
+
+	// required so that we can use it with sqlite params
+	args := make([]any, 0, 20)
+
+	// build the sql from the tree
+	sql := tree.BuildSql(clause, &args)
+
+	return &SqlBoolQueryResp{Sql: sql, Args: args}, nil
+
+}
+
+func SqlBoolQuery(query string, clause SqlClauseFunc) (*SqlBoolQueryResp, error) {
+
+	// first normalize query to replace spaces with + to be treated as ands
+	query = normalizeImplicitAnd(query)
+
+	parser := NewParser(query)
+
+	// create the expression tree
+	tree, err := parser.ParseExpr()
+
+	if err != nil {
+		return nil, err
+	}
+
+	// required so that we can use it with sqlite params
+	args := make([]any, 0, 20)
+
+	// build the sql from the tree
 	sql := tree.BuildSql(clause, &args)
 
 	return &SqlBoolQueryResp{Sql: sql, Args: args}, nil
