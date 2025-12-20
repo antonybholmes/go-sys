@@ -42,70 +42,128 @@ type (
 	}
 )
 
-func normalizeImplicitAnd(input string) string {
+// func normalizeImplicitAnd(input string) string {
 
+// 	var b strings.Builder
+// 	inQuotes := false
+// 	last := rune(0)
+// 	lastWasSpace := false
+// 	i := 0
+// 	n := len(input)
+
+// 	for i < n {
+// 		ch := rune(input[i])
+
+// 		switch ch {
+// 		case '"':
+// 			// strings between quotes are used as is
+// 			inQuotes = !inQuotes
+// 			b.WriteRune(ch)
+// 			i++
+// 		case ' ':
+// 			if inQuotes {
+// 				// preserve spaces exactly inside quotes
+// 				b.WriteRune(ch)
+// 				i++
+// 				continue
+// 			}
+
+// 			if isWordChar(last) {
+// 				lastWasSpace = true
+// 			}
+
+// 			// consume run of spaces
+// 			// j := i
+// 			// for j < n && input[j] == ' ' {
+// 			// 	j++
+// 			// }
+
+// 			// // this will be the character after the spaces
+// 			// next := rune(0)
+// 			// if j < n {
+// 			// 	next = rune(input[j])
+// 			// }
+
+// 			// if isWordChar(last) && isWordChar(next) {
+// 			// 	b.WriteRune('+') // implicit AND
+// 			// 	last = '+'
+// 			// }
+
+// 			// // skip all spaces
+// 			// i = j
+// 		case '+', ',', '(':
+// 			b.WriteRune(ch)
+// 			i++
+
+// 			if inQuotes {
+// 				// preserve spaces exactly inside quotes
+// 				continue
+// 			}
+
+// 			// the last non-space character we've seen
+// 			last = ch
+// 			lastWasSpace = false
+
+// 			// consume run of spaces
+// 			// for i < n && input[i] == ' ' {
+// 			// 	i++
+// 			// }
+// 		default:
+// 			b.WriteRune(ch)
+// 			last = ch
+// 			i++
+// 		}
+
+// 	}
+
+// 	return b.String()
+// }
+
+func normalizeImplicitAnd(input string) string {
 	var b strings.Builder
 	inQuotes := false
 	last := rune(0)
+	isRunOfSpaces := false
 
-	for i := 0; i < len(input); {
-		ch := rune(input[i])
-
+	for _, ch := range input {
 		switch ch {
 		case '"':
-			// strings between quotes are used as is
 			inQuotes = !inQuotes
 			b.WriteRune(ch)
-			i++
+			isRunOfSpaces = false
+
 		case ' ':
 			if inQuotes {
-				// preserve spaces exactly inside quotes
 				b.WriteRune(ch)
-				i++
+				isRunOfSpaces = false
 				continue
 			}
 
-			// consume run of spaces
-			j := i
-			for j < len(input) && input[j] == ' ' {
-				j++
+			// we last ended on a word character
+			// so this could be an implicit AND if
+			// it's a run of spaces between word characters
+			if isWordChar(last) {
+				isRunOfSpaces = true
 			}
 
-			// this will be the character after the spaces
-			next := rune(0)
-			if j < len(input) {
-				next = rune(input[j])
-			}
-
-			if isWordChar(last) && isWordChar(next) {
-				b.WriteRune('+') // implicit AND
-				last = '+'
-			}
-
-			// skip all spaces
-			i = j
 		case '+', ',', '(':
 			b.WriteRune(ch)
-			i++
 
-			if inQuotes {
-				// preserve spaces exactly inside quotes
-				continue
-			}
-
-			// the last non-space character we've seen
-			last = ch
-
-			// consume run of spaces
-			for i < len(input) && input[i] == ' ' {
-				i++
+			if !inQuotes {
+				last = ch
+				isRunOfSpaces = false
 			}
 		default:
+			// the last was a word char and we had a
+			// run of spaces, so insert a + as implicit AND
+			if isRunOfSpaces && isWordChar(last) && isWordChar(ch) {
+				b.WriteRune('+')
+			}
+
 			b.WriteRune(ch)
 			last = ch
-			i++
+			isRunOfSpaces = false
 		}
-
 	}
 
 	return b.String()
