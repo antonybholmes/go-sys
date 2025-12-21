@@ -12,18 +12,32 @@ import (
 	"github.com/antonybholmes/go-sys/log"
 )
 
-// Node represents an expression tree node
 type (
+	// Node represents an expression tree node
 	Node interface {
-		//Eval(vars map[string]bool) bool
-		BuildSql(clause SqlClauseFunc, args *[]string) string
+		// Builds the sql representation of this node
+		// using the given clause function to create
+		// the sql for each search term
+		// Param clause function to create sql clause for
+		// each search term here it becomes user and database
+		// specific so user supplies function to supply the
+		// actual sql clause for each term
+		// Param args is a pointer to a slice of strings
+		// that we append the actual search term values to
+		// as we build the sql so that the caller can use
+		// them as query parameters.
+		// Param addParens indicates whether to add parentheses
+		// around the generated sql for this node, useful to
+		// reduce excessively nested expressions, e.g. NOT operand
+		// does not need parens around its child as it is self contained.
+		// We delegate whether to add parens to the sub expression since
+		// simple sql statements may not require them.
+		BuildSql(clause SqlClauseFunc, addParens bool, args *[]string) string
 	}
 
 	// SearchTermNode for variables like A, B, etc.
 	SearchTermNode struct {
-		Value string
-		//MatchType MatchType
-		//Not       bool
+		Term string
 	}
 
 	NotNode struct {
@@ -254,6 +268,7 @@ func isWordChar(c rune) bool {
 		c == '^' ||
 		c == '$' ||
 		c == '.' ||
+		c == ':' ||
 		c == '%' ||
 		c == '*' ||
 		c == '?'
@@ -278,7 +293,7 @@ func newSearchTermNode(raw string, isExact bool, hasWildcards bool) (*SearchTerm
 		return nil, errors.New("empty search term")
 	}
 
-	ret := SearchTermNode{Value: raw} //, MatchType: MatchTypeContains}
+	ret := SearchTermNode{Term: raw} //, MatchType: MatchTypeContains}
 
 	// if strings.HasPrefix(raw, "-") {
 	// 	ret.Not = true
@@ -289,12 +304,15 @@ func newSearchTermNode(raw string, isExact bool, hasWildcards bool) (*SearchTerm
 	// 	}
 	// }
 
+	// Here wildcards refers only to %. If the user has specified
+	// single character wildcards with ?, we will still add % around
+	// the term unless it's an exact match
 	if !isExact && !hasWildcards {
 		// if not exact match and user has not specified wildcards,
 		// we default to contains by adding % around the term since
 		// this the most intuitive behavior to look for anything
 		// that contains the term we asked for
-		ret.Value = "%" + ret.Value + "%"
+		ret.Term = "%" + ret.Term + "%"
 	}
 
 	// switch {
@@ -344,7 +362,7 @@ func newSearchTermNode(raw string, isExact bool, hasWildcards bool) (*SearchTerm
 // 	return vars[v.Value]
 // }
 
-func (v SearchTermNode) BuildSql(clause SqlClauseFunc, args *[]string) string {
+func (v SearchTermNode) BuildSql(clause SqlClauseFunc, addParens bool, args *[]string) string {
 	// switch v.MatchType {
 	// case MatchTypeExact:
 	// 	*args = append(*args, v.Value)
@@ -356,7 +374,7 @@ func (v SearchTermNode) BuildSql(clause SqlClauseFunc, args *[]string) string {
 	// 	*args = append(*args, "%"+v.Value+"%")
 	// }
 
-	*args = append(*args, v.Value)
+	*args = append(*args, v.Term)
 
 	//log.Debug().Msgf("args %v", args)
 
@@ -364,7 +382,7 @@ func (v SearchTermNode) BuildSql(clause SqlClauseFunc, args *[]string) string {
 	// the current length of the args slice as we add to it
 	placeholderIndex := len(*args) //fmt.Sprintf("?%d", len(*args))
 	//tagClauses = append(tagClauses, fmt.Sprintf("(gex.gene_symbol LIKE %s OR gex.ensembl_id LIKE %s)", placeholder, placeholder))
-	return clause(placeholderIndex, v.Value)
+	return clause(placeholderIndex, v.Term, addParens)
 }
 
 // func (a AndNode) Eval(vars map[string]bool) bool {
@@ -372,26 +390,20 @@ func (v SearchTermNode) BuildSql(clause SqlClauseFunc, args *[]string) string {
 // }
 
 // highest precedence is to negate a term
-func (n NotNode) BuildSql(clause SqlClauseFunc, args *[]string) string {
-	return "NOT (" + n.Child.BuildSql(clause, args) + ")"
+func (n NotNode) BuildSql(clause SqlClauseFunc, addParens bool, args *[]string) string {
+	return "NOT (" + n.Child.BuildSql(clause, false, args) + ")"
 }
 
-func (a AndNode) BuildSql(clause SqlClauseFunc, args *[]string) string {
-	return "(" + a.Left.BuildSql(clause, args) + " AND " + a.Right.BuildSql(clause, args) + ")"
+func (a AndNode) BuildSql(clause SqlClauseFunc, addParens bool, args *[]string) string {
+	return AddParens(a.Left.BuildSql(clause, true, args)+" AND "+a.Right.BuildSql(clause, true, args), addParens)
 }
 
 // func (o OrNode) Eval(vars map[string]bool) bool {
 // 	return o.Left.Eval(vars) || o.Right.Eval(vars)
 // }
 
-func (o OrNode) BuildSql(clause SqlClauseFunc, args *[]string) string {
-
-	// each side builds its own sql recursively. They do not
-	// require parentheses on the left and right sub-expressions
-	// since these will recursively be added as the expression
-	// is built, so they would be redundant here and just make
-	// the query longer than it needs to be.
-	return "(" + o.Left.BuildSql(clause, args) + " OR " + o.Right.BuildSql(clause, args) + ")"
+func (o OrNode) BuildSql(clause SqlClauseFunc, addParens bool, args *[]string) string {
+	return AddParens(o.Left.BuildSql(clause, true, args)+" OR "+o.Right.BuildSql(clause, true, args), addParens)
 }
 
 func NewParser(input string) *Parser {
@@ -462,7 +474,7 @@ func (p *Parser) parseNotSubClause() (Node, error) {
 	p.skipWhitespace()
 
 	// check for NOT operator
-	if p.peek() == '-' {
+	if p.peek() == '-' || p.peek() == '!' {
 		p.next()
 		child, err := p.parseSearchTerm()
 
@@ -603,9 +615,10 @@ func (p *Parser) parseSearchTerm() (Node, error) {
 	value := strings.TrimSpace(p.input[start:p.pos])
 
 	isExact := strings.HasPrefix(value, "=") || (strings.HasPrefix(value, "^") && strings.HasSuffix(value, "$"))
-	hasWildcards := strings.ContainsAny(value, "%_*")
+	hasWildcards := strings.ContainsAny(value, "%")
+	hasSingleWildcards := strings.ContainsAny(value, "?")
 
-	if isExact && hasWildcards {
+	if isExact && (hasWildcards || hasSingleWildcards) {
 		return nil, errors.New("cannot have wildcards in exact match")
 	}
 
@@ -656,7 +669,7 @@ func SqlBoolQueryFromTree(tree Node, clause SqlClauseFunc) (*SqlBoolQueryResp, e
 	args := make([]string, 0, 20)
 
 	// build the sql from the tree
-	sql := tree.BuildSql(clause, &args)
+	sql := tree.BuildSql(clause, false, &args)
 
 	return &SqlBoolQueryResp{Sql: sql, Args: args}, nil
 
@@ -676,20 +689,30 @@ func SqlBoolQuery(query string, clause SqlClauseFunc) (*SqlBoolQueryResp, error)
 		return nil, err
 	}
 
-	// required so that we can use it with sqlite params
+	// As we parse, we build up the args slice of search terms
+	// in order that they appear in the sql
 	args := make([]string, 0, 20)
 
 	// build the sql from the tree
-	sql := tree.BuildSql(clause, &args)
+	sql := tree.BuildSql(clause, false, &args)
 
 	return &SqlBoolQueryResp{Sql: sql, Args: args}, nil
 
+}
+
+// Adds parentheses around the sql if addParens is true
+func AddParens(sql string, addParens bool) string {
+	if addParens {
+		return "(" + sql + ")"
+	}
+	return sql
 }
 
 func IndexedPlaceholder(index int) string {
 	return fmt.Sprintf("p%d", index)
 }
 
+// Creates a standard sql named parameter like :p1, :p2, etc.
 func IndexedParam(index int) string {
 	return ":" + IndexedPlaceholder(index)
 }
