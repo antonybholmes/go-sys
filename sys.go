@@ -27,7 +27,8 @@ func Must[T any](v T, err error) T {
 	return v
 }
 
-func BaseMust(err error) {
+// panics on error for functions that return only error
+func VoidMust(err error) {
 	if err != nil {
 		panic(err)
 	}
@@ -117,4 +118,16 @@ func MinDuration(a, b time.Duration) time.Duration {
 // Atoi converts a string to int, ignoring commas
 func Atoi(s string) (int, error) {
 	return strconv.Atoi(strings.ReplaceAll(s, ",", ""))
+}
+
+func IsAlpha(b byte) bool {
+	return (b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z')
+}
+
+func IsUpperAlpha(b byte) bool {
+	return b >= 'A' && b <= 'Z'
+}
+
+func IsDigit(c byte) bool {
+	return c >= '0' && c <= '9'
 }

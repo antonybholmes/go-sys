@@ -6,6 +6,7 @@ import (
 	"strings"
 	"unicode"
 
+	"github.com/antonybholmes/go-sys"
 	"github.com/antonybholmes/go-sys/log"
 )
 
@@ -119,17 +120,66 @@ type (
 // 	return b.String()
 // }
 
-func normalizeImplicitAnd(input string) string {
+func normalizeBooleanWords(input string) string {
+	var b strings.Builder
+
+	inQuotes := false
+
+	for i := 0; i < len(input); {
+		ch := input[i]
+
+		if ch == '"' {
+			inQuotes = !inQuotes
+			b.WriteByte(ch)
+			i++
+			continue
+		}
+
+		// look for runs of letters that could be boolean words
+		// and either replace or leaveas as is e.g x AND y -> x+y
+		// but cANDy stays as is
+		if !inQuotes && sys.IsAlpha(ch) {
+			start := i
+			for i < len(input) && sys.IsAlpha(input[i]) {
+				i++
+			}
+
+			word := input[start:i]
+			switch word {
+			case "AND":
+				b.WriteByte('+')
+			case "OR":
+				b.WriteByte(',')
+			default:
+				b.WriteString(word)
+			}
+			continue
+		}
+
+		b.WriteByte(ch)
+		i++
+	}
+
+	return b.String()
+}
+
+// Deals with implicit ANDs represented by spaces between words
+// and also normalizes boolean words like AND/OR to +/,
+func normalizeQuery(input string) string {
 	var b strings.Builder
 	inQuotes := false
 	last := rune(0)
 	isRunOfSpaces := false
+
+	// replace of AND/OR words first
+	input = normalizeBooleanWords(input)
 
 	for _, ch := range input {
 		switch ch {
 		case '"':
 			inQuotes = !inQuotes
 			b.WriteRune(ch)
+			last = ch
 			isRunOfSpaces = false
 
 		case ' ':
@@ -142,7 +192,7 @@ func normalizeImplicitAnd(input string) string {
 			// we last ended on a word character
 			// so this could be an implicit AND if
 			// it's a run of spaces between word characters
-			if isWordChar(last) {
+			if isSearchTermChar(last) {
 				isRunOfSpaces = true
 			}
 
@@ -156,7 +206,7 @@ func normalizeImplicitAnd(input string) string {
 		default:
 			// the last was a word char and we had a
 			// run of spaces, so insert a + as implicit AND
-			if isRunOfSpaces && isWordChar(last) && isWordChar(ch) {
+			if isRunOfSpaces && isSearchTermChar(last) && isSearchTermChar(ch) {
 				b.WriteRune('+')
 			}
 
@@ -169,20 +219,21 @@ func normalizeImplicitAnd(input string) string {
 	return b.String()
 }
 
-func isSearchTermChar(c rune) bool {
+// represents a search token that is not part of a boolean expression
+func isWordChar(c rune) bool {
 	return unicode.IsLetter(c) || unicode.IsDigit(c) || c == '-' || c == '_' || c == '=' || c == '^' || c == '$' || c == '.'
 }
 
-func isWordChar(c rune) bool {
-	return isSearchTermChar(c) || c == '(' || c == ')'
+func isSearchTermChar(c rune) bool {
+	return isWordChar(c) || c == '(' || c == ')'
 }
 
-func peek(s string, i int) rune {
-	if i >= len(s) {
-		return 0
-	}
-	return rune(s[i])
-}
+// func peek(s string, i int) rune {
+// 	if i >= len(s) {
+// 		return 0
+// 	}
+// 	return rune(s[i])
+// }
 
 func makeSearchNode(raw string) (*SearchNode, error) {
 
@@ -262,6 +313,8 @@ func (v SearchNode) BuildSql(clause SqlClauseFunc, args *[]any) string {
 
 	//log.Debug().Msgf("args %v", args)
 
+	// as we parse the tree in order, the placeholder index is just
+	// the current length of the args slice as we add to it
 	placeholderIndex := len(*args) //fmt.Sprintf("?%d", len(*args))
 	//tagClauses = append(tagClauses, fmt.Sprintf("(gex.gene_symbol LIKE %s OR gex.ensembl_id LIKE %s)", placeholder, placeholder))
 	return clause(placeholderIndex, v.MatchType, v.Not)
@@ -314,6 +367,12 @@ func (p *Parser) skipWhitespace() {
 // Entry point: parse expression with OR as lowest precedence
 // e.g. A + B, C would be (A AND B) OR C
 func (p *Parser) ParseExpr() (Node, error) {
+	return p.parseOrSubClause()
+}
+
+// Handle ORs
+func (p *Parser) parseOrSubClause() (Node, error) {
+	// and takes precedence over or
 	left, err := p.parseAndSubClause()
 
 	if err != nil {
@@ -403,7 +462,7 @@ func (p *Parser) parseSearchTerm() (Node, error) {
 	// so we parse that recursively
 	if ch == '(' {
 		p.next()
-		expr, err := p.ParseExpr()
+		expr, err := p.parseOrSubClause()
 
 		if err != nil {
 			return nil, err
@@ -454,7 +513,7 @@ func (p *Parser) parseSearchTerm() (Node, error) {
 
 	// keep advancing until we reach the end of the
 	// search term i.e. a space or other expression char
-	for isSearchTermChar(p.peek()) {
+	for isWordChar(p.peek()) {
 		p.next()
 	}
 
@@ -484,7 +543,7 @@ type SqlBoolQueryResp struct {
 func SqlBoolTree(query string) (Node, error) {
 
 	// first normalize query to replace spaces with + to be treated as ands
-	query = normalizeImplicitAnd(query)
+	query = normalizeQuery(query)
 
 	log.Debug().Msgf("normalized query: %s", query)
 
@@ -515,7 +574,7 @@ func SqlBoolQueryFromTree(tree Node, clause SqlClauseFunc) (*SqlBoolQueryResp, e
 func SqlBoolQuery(query string, clause SqlClauseFunc) (*SqlBoolQueryResp, error) {
 
 	// first normalize query to replace spaces with + to be treated as ands
-	query = normalizeImplicitAnd(query)
+	query = normalizeQuery(query)
 
 	parser := NewParser(query)
 
