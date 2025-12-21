@@ -17,7 +17,8 @@ type (
 	// statement, therefore for sql systems that support ?1 type
 	// variables you can use that, otherwise it can be ignored
 	// and the generic '?' used.
-	SqlClauseFunc func(placeholderIndex int, matchType MatchType, not bool) string
+	//SqlClauseFunc func(placeholderIndex int, matchType MatchType, not bool) string
+	SqlClauseFunc func(placeholderIndex int, value string) string
 
 	Term struct {
 		Value string
@@ -36,7 +37,7 @@ var (
 	// matches any invalid characters for stripping out of queries,
 	// not we allow parentheses for simple boolean query building if
 	// desired
-	InvalidCharsRegex = regexp.MustCompile(`[^a-zA-Z0-9,\+\ \=\"\^\$\(\)\.\-]+`)
+	InvalidCharsRegex = regexp.MustCompile(`[^a-zA-Z0-9,\+\ \=\"\^\$\(\)\.\-\?\*]+`)
 
 	AndTermRegex = regexp.MustCompile(`(=)?"([^"]+)"|(=)?([^"+,\s]+)`)
 )

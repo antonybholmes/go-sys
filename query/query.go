@@ -1,7 +1,9 @@
 package query
 
 import (
+	"database/sql"
 	"errors"
+	"fmt"
 
 	"strings"
 	"unicode"
@@ -14,14 +16,18 @@ import (
 type (
 	Node interface {
 		//Eval(vars map[string]bool) bool
-		BuildSql(clause SqlClauseFunc, args *[]any) string
+		BuildSql(clause SqlClauseFunc, args *[]string) string
 	}
 
-	// SearchNode for variables like A, B, etc.
-	SearchNode struct {
-		Value     string
-		MatchType MatchType
-		Not       bool
+	// SearchTermNode for variables like A, B, etc.
+	SearchTermNode struct {
+		Value string
+		//MatchType MatchType
+		//Not       bool
+	}
+
+	NotNode struct {
+		Child Node
 	}
 
 	// AndNode for AND operations
@@ -203,6 +209,25 @@ func normalizeQuery(input string) string {
 				last = ch
 				isRunOfSpaces = false
 			}
+		case '*':
+			if !inQuotes {
+				// convert * to % for SQL wildcard
+				ch = '%'
+			}
+
+			b.WriteRune(ch)
+			last = ch
+			isRunOfSpaces = false
+		case '?':
+			if !inQuotes {
+				// convert _ to _ for SQL single char wildcard
+				ch = '_'
+			}
+
+			b.WriteRune(ch)
+			last = ch
+			isRunOfSpaces = false
+
 		default:
 			// the last was a word char and we had a
 			// run of spaces, so insert a + as implicit AND
@@ -221,7 +246,17 @@ func normalizeQuery(input string) string {
 
 // represents a search token that is not part of a boolean expression
 func isWordChar(c rune) bool {
-	return unicode.IsLetter(c) || unicode.IsDigit(c) || c == '-' || c == '_' || c == '=' || c == '^' || c == '$' || c == '.'
+	return unicode.IsLetter(c) ||
+		unicode.IsDigit(c) ||
+		c == '-' ||
+		c == '_' ||
+		c == '=' ||
+		c == '^' ||
+		c == '$' ||
+		c == '.' ||
+		c == '%' ||
+		c == '*' ||
+		c == '?'
 }
 
 func isSearchTermChar(c rune) bool {
@@ -235,62 +270,72 @@ func isSearchTermChar(c rune) bool {
 // 	return rune(s[i])
 // }
 
-func makeSearchNode(raw string) (*SearchNode, error) {
+// Creates a new SearchTermNode from the raw string.
+// This is the atomic unit of a search expression tree.
+func newSearchTermNode(raw string, isExact bool, hasWildcards bool) (*SearchTermNode, error) {
 
 	if len(raw) == 0 {
 		return nil, errors.New("empty search term")
 	}
 
-	ret := SearchNode{Value: "", MatchType: MatchTypeContains, Not: false}
+	ret := SearchTermNode{Value: raw} //, MatchType: MatchTypeContains}
 
-	if strings.HasPrefix(raw, "-") {
-		ret.Not = true
-		raw = raw[1:]
+	// if strings.HasPrefix(raw, "-") {
+	// 	ret.Not = true
+	// 	raw = raw[1:]
 
-		if len(raw) == 0 {
-			return nil, errors.New("empty search term")
-		}
+	// 	if len(raw) == 0 {
+	// 		return nil, errors.New("empty search term")
+	// 	}
+	// }
+
+	if !isExact && !hasWildcards {
+		// if not exact match and user has not specified wildcards,
+		// we default to contains by adding % around the term since
+		// this the most intuitive behavior to look for anything
+		// that contains the term we asked for
+		ret.Value = "%" + ret.Value + "%"
 	}
 
-	switch {
-	case strings.HasPrefix(raw, "="):
-		if len(raw) == 1 {
-			return nil, errors.New("empty search term")
-		}
+	// switch {
+	// case strings.HasPrefix(raw, "="):
+	// 	if len(raw) == 1 {
+	// 		return nil, errors.New("empty search term")
+	// 	}
 
-		ret.Value = raw[1:]
-		ret.MatchType = MatchTypeExact
+	// 	ret.Value = raw[1:]
+	// 	ret.MatchType = MatchTypeExact
 
-	case strings.HasPrefix(raw, "^") && strings.HasSuffix(raw, "$"):
-		if len(raw) == 2 {
-			return nil, errors.New("empty search term")
-		}
+	// case strings.HasPrefix(raw, "^") && strings.HasSuffix(raw, "$"):
+	// 	if len(raw) == 2 {
+	// 		return nil, errors.New("empty search term")
+	// 	}
 
-		ret.Value = raw[1 : len(raw)-1]
-		ret.MatchType = MatchTypeExact
+	// 	ret.Value = raw[1 : len(raw)-1]
+	// 	ret.MatchType = MatchTypeExact
 
-	case strings.HasPrefix(raw, "^"):
-		if len(raw) == 1 {
-			return nil, errors.New("empty search term")
-		}
+	// case strings.HasPrefix(raw, "^"):
+	// 	if len(raw) == 1 {
+	// 		return nil, errors.New("empty search term")
+	// 	}
 
-		ret.Value = raw[1:]
-		ret.MatchType = MatchTypeStartsWith
+	// 	ret.Value = raw[1:]
+	// 	ret.MatchType = MatchTypeStartsWith
 
-	case strings.HasSuffix(raw, "$"):
-		if len(raw) == 1 {
-			return nil, errors.New("empty search term")
-		}
+	// case strings.HasSuffix(raw, "$"):
+	// 	if len(raw) == 1 {
+	// 		return nil, errors.New("empty search term")
+	// 	}
 
-		ret.Value = raw[:len(raw)-1]
-		ret.MatchType = MatchTypeEndsWith
+	// 	ret.Value = raw[:len(raw)-1]
+	// 	ret.MatchType = MatchTypeEndsWith
 
-	default:
-		// default to starts with search since
-		// it's the most useful for gene symbols etc.
-		ret.Value = raw
-		//ret.MatchType = MatchTypeStartsWith
-	}
+	// default:
+	// 	// default to starts with search since
+	// 	// it's the most useful for gene symbols etc.
+	// 	ret.Value = raw
+	// 	//ret.MatchType = MatchTypeStartsWith
+	// }
 
 	return &ret, nil
 }
@@ -299,17 +344,19 @@ func makeSearchNode(raw string) (*SearchNode, error) {
 // 	return vars[v.Value]
 // }
 
-func (v SearchNode) BuildSql(clause SqlClauseFunc, args *[]any) string {
-	switch v.MatchType {
-	case MatchTypeExact:
-		*args = append(*args, v.Value)
-	case MatchTypeStartsWith:
-		*args = append(*args, v.Value+"%")
-	case MatchTypeEndsWith:
-		*args = append(*args, "%"+v.Value)
-	default:
-		*args = append(*args, "%"+v.Value+"%")
-	}
+func (v SearchTermNode) BuildSql(clause SqlClauseFunc, args *[]string) string {
+	// switch v.MatchType {
+	// case MatchTypeExact:
+	// 	*args = append(*args, v.Value)
+	// case MatchTypeStartsWith:
+	// 	*args = append(*args, v.Value+"%")
+	// case MatchTypeEndsWith:
+	// 	*args = append(*args, "%"+v.Value)
+	// default:
+	// 	*args = append(*args, "%"+v.Value+"%")
+	// }
+
+	*args = append(*args, v.Value)
 
 	//log.Debug().Msgf("args %v", args)
 
@@ -317,14 +364,19 @@ func (v SearchNode) BuildSql(clause SqlClauseFunc, args *[]any) string {
 	// the current length of the args slice as we add to it
 	placeholderIndex := len(*args) //fmt.Sprintf("?%d", len(*args))
 	//tagClauses = append(tagClauses, fmt.Sprintf("(gex.gene_symbol LIKE %s OR gex.ensembl_id LIKE %s)", placeholder, placeholder))
-	return clause(placeholderIndex, v.MatchType, v.Not)
+	return clause(placeholderIndex, v.Value)
 }
 
 // func (a AndNode) Eval(vars map[string]bool) bool {
 // 	return a.Left.Eval(vars) && a.Right.Eval(vars)
 // }
 
-func (a AndNode) BuildSql(clause SqlClauseFunc, args *[]any) string {
+// highest precedence is to negate a term
+func (n NotNode) BuildSql(clause SqlClauseFunc, args *[]string) string {
+	return "NOT (" + n.Child.BuildSql(clause, args) + ")"
+}
+
+func (a AndNode) BuildSql(clause SqlClauseFunc, args *[]string) string {
 	return "(" + a.Left.BuildSql(clause, args) + " AND " + a.Right.BuildSql(clause, args) + ")"
 }
 
@@ -332,7 +384,13 @@ func (a AndNode) BuildSql(clause SqlClauseFunc, args *[]any) string {
 // 	return o.Left.Eval(vars) || o.Right.Eval(vars)
 // }
 
-func (o OrNode) BuildSql(clause SqlClauseFunc, args *[]any) string {
+func (o OrNode) BuildSql(clause SqlClauseFunc, args *[]string) string {
+
+	// each side builds its own sql recursively. They do not
+	// require parentheses on the left and right sub-expressions
+	// since these will recursively be added as the expression
+	// is built, so they would be redundant here and just make
+	// the query longer than it needs to be.
 	return "(" + o.Left.BuildSql(clause, args) + " OR " + o.Right.BuildSql(clause, args) + ")"
 }
 
@@ -400,9 +458,28 @@ func (p *Parser) parseOrSubClause() (Node, error) {
 	return left, nil
 }
 
+func (p *Parser) parseNotSubClause() (Node, error) {
+	p.skipWhitespace()
+
+	// check for NOT operator
+	if p.peek() == '-' {
+		p.next()
+		child, err := p.parseSearchTerm()
+
+		if err != nil {
+			return nil, err
+		}
+
+		return NotNode{Child: child}, nil
+	}
+
+	// otherwise parse as normal search term
+	return p.parseSearchTerm()
+}
+
 // Handle ANDs
 func (p *Parser) parseAndSubClause() (Node, error) {
-	left, err := p.parseSearchTerm()
+	left, err := p.parseNotSubClause() //  p.parseSearchTerm()
 
 	if err != nil {
 		return nil, err
@@ -494,12 +571,12 @@ func (p *Parser) parseSearchTerm() (Node, error) {
 			return nil, errors.New("unterminated quoted variable")
 		}
 
-		value := p.input[start:p.pos]
+		word := p.input[start:p.pos]
 
 		// consume closing quote
 		p.next()
 
-		ret, err := makeSearchNode(value)
+		ret, err := newSearchTermNode(word, true, false)
 
 		if err != nil {
 			return nil, err
@@ -525,8 +602,22 @@ func (p *Parser) parseSearchTerm() (Node, error) {
 	// extract the token without leading/trailing spaces
 	value := strings.TrimSpace(p.input[start:p.pos])
 
+	isExact := strings.HasPrefix(value, "=") || (strings.HasPrefix(value, "^") && strings.HasSuffix(value, "$"))
+	hasWildcards := strings.ContainsAny(value, "%_*")
+
+	if isExact && hasWildcards {
+		return nil, errors.New("cannot have wildcards in exact match")
+	}
+
+	if isExact {
+		// strip exact match markers
+		value = strings.TrimPrefix(value, "=")
+		value = strings.TrimPrefix(value, "^")
+		value = strings.TrimSuffix(value, "$")
+	}
+
 	// make it into a SearchNode which also determines the match type
-	ret, err := makeSearchNode(value)
+	ret, err := newSearchTermNode(value, isExact, hasWildcards)
 
 	if err != nil {
 		return nil, err
@@ -537,7 +628,7 @@ func (p *Parser) parseSearchTerm() (Node, error) {
 
 type SqlBoolQueryResp struct {
 	Sql  string
-	Args []any
+	Args []string
 }
 
 func SqlBoolTree(query string) (Node, error) {
@@ -562,7 +653,7 @@ func SqlBoolTree(query string) (Node, error) {
 func SqlBoolQueryFromTree(tree Node, clause SqlClauseFunc) (*SqlBoolQueryResp, error) {
 
 	// required so that we can use it with sqlite params
-	args := make([]any, 0, 20)
+	args := make([]string, 0, 20)
 
 	// build the sql from the tree
 	sql := tree.BuildSql(clause, &args)
@@ -586,13 +677,31 @@ func SqlBoolQuery(query string, clause SqlClauseFunc) (*SqlBoolQueryResp, error)
 	}
 
 	// required so that we can use it with sqlite params
-	args := make([]any, 0, 20)
+	args := make([]string, 0, 20)
 
 	// build the sql from the tree
 	sql := tree.BuildSql(clause, &args)
 
 	return &SqlBoolQueryResp{Sql: sql, Args: args}, nil
 
+}
+
+func IndexedPlaceholder(index int) string {
+	return fmt.Sprintf("p%d", index)
+}
+
+func IndexedParam(index int) string {
+	return ":" + IndexedPlaceholder(index)
+}
+
+// Defines named args for sql queries with indexed parameters
+func IndexedNamedArgs(args []string) []any {
+	ret := make([]any, 0, len(args))
+
+	for i, arg := range args {
+		ret = append(ret, sql.Named(IndexedPlaceholder(i+1), arg))
+	}
+	return ret
 }
 
 // func main() {
