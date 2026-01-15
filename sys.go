@@ -120,11 +120,11 @@ func Atoi(s string) (int, error) {
 	return strconv.Atoi(strings.ReplaceAll(s, ",", ""))
 }
 
-func IsAlpha(b byte) bool {
+func IsLetter(b byte) bool {
 	return (b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z')
 }
 
-func IsUpperAlpha(b byte) bool {
+func IsUpperLetter(b byte) bool {
 	return b >= 'A' && b <= 'Z'
 }
 

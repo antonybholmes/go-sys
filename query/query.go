@@ -158,9 +158,9 @@ func normalizeBooleanWords(input string) string {
 		// look for runs of letters that could be boolean words
 		// and either replace or leaveas as is e.g x AND y -> x+y
 		// but cANDy stays as is
-		if !inQuotes && sys.IsAlpha(ch) {
+		if !inQuotes && sys.IsLetter(ch) {
 			start := i
-			for i < len(input) && sys.IsAlpha(input[i]) {
+			for i < len(input) && sys.IsLetter(input[i]) {
 				i++
 			}
 
