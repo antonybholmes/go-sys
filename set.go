@@ -1,6 +1,9 @@
 package sys
 
-import "slices"
+import (
+	"maps"
+	"slices"
+)
 
 // Implementation of a set using generics and maps
 // since Go does not have sets built in
@@ -37,12 +40,12 @@ func (s *Set[T]) Has(v T) bool {
 
 // Returns a slice of the keys in the set
 func (s *Set[T]) Keys() []T {
-	keys := make([]T, 0, len(s.items))
-	for key := range s.items {
-		keys = append(keys, key)
-	}
+	// keys := make([]T, 0, len(s.items))
+	// for key := range s.items {
+	// 	keys = append(keys, key)
+	// }
 
-	return keys
+	return slices.Collect(maps.Keys(s.items))
 }
 
 // Returns the insection of a map with another
@@ -141,12 +144,9 @@ func NewStringSet() *StringSet {
 	}
 }
 
-// Shadowed method - StringSet keys are returned sorted
-func (s *StringSet) Keys() []string {
-	keys := make([]string, 0, len(s.items))
-	for key := range s.items {
-		keys = append(keys, key)
-	}
+// StringSet keys are returned sorted
+func (s *StringSet) SortedKeys() []string {
+	keys := s.Keys()
 
 	slices.Sort(keys)
 
