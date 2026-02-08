@@ -13,6 +13,7 @@ import (
 
 const (
 	Sqlite3DB  = "sqlite3"
+	Sqlite3RO  = "?mode=ro"
 	PostgresDB = "postgres"
 	MySQLDB    = "mysql"
 	BlankUUID  = "00000000-0000-0000-0000-000000000000"
