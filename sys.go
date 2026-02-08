@@ -12,11 +12,11 @@ import (
 )
 
 const (
-	Sqlite3DB  = "sqlite3"
-	Sqlite3RO  = "?mode=ro"
-	PostgresDB = "postgres"
-	MySQLDB    = "mysql"
-	BlankUUID  = "00000000-0000-0000-0000-000000000000"
+	SqliteDB       = "sqlite3"
+	SqliteROSuffix = "?mode=ro"
+	PostgresDB     = "postgres"
+	MySQLDB        = "mysql"
+	BlankUUID      = "00000000-0000-0000-0000-000000000000"
 )
 
 // panics on error or returns value, similar to google's
