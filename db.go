@@ -3,7 +3,7 @@ package sys
 type (
 	IdEntity struct {
 		Id       int    `json:"-"`
-		PublicId string `db:"public_id" json:"id"`
+		PublicId string `db:"public_id" json:"id,omitempty"`
 	}
 
 	Entity struct {
@@ -13,7 +13,7 @@ type (
 )
 
 const (
-	SqliteDB             = "sqlite3"
+	Sqlite3DB            = "sqlite3"
 	SqliteReadOnlySuffix = "?mode=ro"
 	PostgresDB           = "postgres"
 	MySQLDB              = "mysql"
