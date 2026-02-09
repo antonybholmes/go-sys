@@ -11,14 +11,6 @@ import (
 	gonanoid "github.com/matoous/go-nanoid/v2"
 )
 
-const (
-	SqliteDB       = "sqlite3"
-	SqliteROSuffix = "?mode=ro"
-	PostgresDB     = "postgres"
-	MySQLDB        = "mysql"
-	BlankUUID      = "00000000-0000-0000-0000-000000000000"
-)
-
 // panics on error or returns value, similar to google's
 // must in uuid but this is generic
 func Must[T any](v T, err error) T {
