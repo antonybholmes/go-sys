@@ -2,8 +2,8 @@ package sys
 
 type (
 	IdEntity struct {
-		Id       int    `json:"-"`
 		PublicId string `db:"public_id" json:"id,omitempty"`
+		Id       int    `json:"-"`
 	}
 
 	Entity struct {
