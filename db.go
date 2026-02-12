@@ -7,8 +7,8 @@ type (
 	}
 
 	Entity struct {
-		IdEntity
 		Name string `json:"name"`
+		IdEntity
 	}
 )
 
