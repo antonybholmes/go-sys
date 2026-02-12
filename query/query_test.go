@@ -9,7 +9,7 @@ func TestNormalizeQuery(t *testing.T) {
 	x := normalizeQuery(`x+(y AND z) OR "a AND b"`)
 	fmt.Println(x)
 
-	x = normalizeQuery(` (y AND z)+x OR "a AND b"`)
+	x = normalizeQuery("( x+ y ) ,c")
 	fmt.Println(x)
 
 	// Test cases for normalizeQuery

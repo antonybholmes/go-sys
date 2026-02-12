@@ -6,59 +6,6 @@ import (
 	"github.com/antonybholmes/go-sys"
 )
 
-type (
-	SqlClauseFunc func(placeholderIndex int, value string, addParens bool) string
-
-	// Node represents an expression tree node
-	Node interface {
-		// Builds the sql representation of this node
-		// using the given clause function to create
-		// the sql for each search term
-		// Param clause function to create sql clause for
-		// each search term here it becomes user and database
-		// specific so user supplies function to supply the
-		// actual sql clause for each term
-		// Param args is a pointer to a slice of strings
-		// that we append the actual search term values to
-		// as we build the sql so that the caller can use
-		// them as query parameters.
-		// Param addParens indicates whether to add parentheses
-		// around the generated sql for this node, useful to
-		// reduce excessively nested expressions, e.g. NOT operand
-		// does not need parens around its child as it is self contained.
-		// We delegate whether to add parens to the sub expression since
-		// simple sql statements may not require them.
-		BuildSql(clause SqlClauseFunc, addParens bool, args *[]string) string
-	}
-
-	// SearchTermNode for variables like A, B, etc.
-	SearchTermNode struct {
-		Term string
-	}
-
-	NotNode struct {
-		Child Node
-	}
-
-	// AndNode for AND operations
-	AndNode struct {
-		Left  Node
-		Right Node
-	}
-
-	// OrNode for OR operations
-	OrNode struct {
-		Left  Node
-		Right Node
-	}
-
-	// Parser struct
-	Parser struct {
-		input string
-		pos   int
-	}
-)
-
 var (
 	// O(1) lookup for allowed chars to strip out invalid chars from queries
 	allowedChar [256]bool
@@ -175,4 +122,3 @@ func SanitizeQuery(input string) string {
 
 // 	return b.String()
 // }
-

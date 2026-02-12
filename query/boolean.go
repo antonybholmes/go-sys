@@ -11,6 +11,59 @@ import (
 	"github.com/antonybholmes/go-sys/log"
 )
 
+type (
+	SqlClauseFunc func(placeholderIndex int, value string, addParens bool) string
+
+	// Node represents an expression tree node
+	Node interface {
+		// Builds the sql representation of this node
+		// using the given clause function to create
+		// the sql for each search term
+		// Param clause function to create sql clause for
+		// each search term here it becomes user and database
+		// specific so user supplies function to supply the
+		// actual sql clause for each term
+		// Param args is a pointer to a slice of strings
+		// that we append the actual search term values to
+		// as we build the sql so that the caller can use
+		// them as query parameters.
+		// Param addParens indicates whether to add parentheses
+		// around the generated sql for this node, useful to
+		// reduce excessively nested expressions, e.g. NOT operand
+		// does not need parens around its child as it is self contained.
+		// We delegate whether to add parens to the sub expression since
+		// simple sql statements may not require them.
+		BuildSql(clause SqlClauseFunc, addParens bool, args *[]string) string
+	}
+
+	// SearchTermNode for variables like A, B, etc.
+	SearchTermNode struct {
+		Term string
+	}
+
+	NotNode struct {
+		Child Node
+	}
+
+	// AndNode for AND operations
+	AndNode struct {
+		Left  Node
+		Right Node
+	}
+
+	// OrNode for OR operations
+	OrNode struct {
+		Left  Node
+		Right Node
+	}
+
+	// Parser struct
+	Parser struct {
+		input string
+		pos   int
+	}
+)
+
 // Replace boolean words AND/OR with +/, but only when they are separate words
 // and not with quotes
 func normalizeBooleanWords(input string) string {
@@ -100,7 +153,7 @@ func normalizeQuery(input string) string {
 				isRunOfSpaces = true
 			}
 
-		case '+', ',': //, '(':
+		case '+', ',', '(', ')':
 			b.WriteRune(ch)
 
 			// if we are in a run of spaces
@@ -132,7 +185,11 @@ func normalizeQuery(input string) string {
 		default:
 			// the last was a word char and we had a
 			// run of spaces, so insert a + as implicit AND
-			if isRunOfSpaces && isSearchTermChar(last) && isSearchTermChar(ch) {
+			// and can never come after '('
+			if isRunOfSpaces &&
+				isSearchTermChar(last) &&
+				last != '(' &&
+				isSearchTermChar(ch) {
 				b.WriteRune('+')
 			}
 
@@ -249,7 +306,7 @@ func newSearchTermNode(raw string, isExact bool, hasWildcards bool) (*SearchTerm
 // 	return vars[v.Value]
 // }
 
-func (v SearchTermNode) BuildSql(clause SqlClauseFunc, addParens bool, args *[]string) string {
+func (v *SearchTermNode) BuildSql(clause SqlClauseFunc, addParens bool, args *[]string) string {
 	// switch v.MatchType {
 	// case MatchTypeExact:
 	// 	*args = append(*args, v.Value)
@@ -277,11 +334,11 @@ func (v SearchTermNode) BuildSql(clause SqlClauseFunc, addParens bool, args *[]s
 // }
 
 // highest precedence is to negate a term
-func (n NotNode) BuildSql(clause SqlClauseFunc, addParens bool, args *[]string) string {
+func (n *NotNode) BuildSql(clause SqlClauseFunc, addParens bool, args *[]string) string {
 	return "NOT (" + n.Child.BuildSql(clause, false, args) + ")"
 }
 
-func (a AndNode) BuildSql(clause SqlClauseFunc, addParens bool, args *[]string) string {
+func (a *AndNode) BuildSql(clause SqlClauseFunc, addParens bool, args *[]string) string {
 	return AddParens(a.Left.BuildSql(clause, true, args)+" AND "+a.Right.BuildSql(clause, true, args), addParens)
 }
 
@@ -289,7 +346,7 @@ func (a AndNode) BuildSql(clause SqlClauseFunc, addParens bool, args *[]string) 
 // 	return o.Left.Eval(vars) || o.Right.Eval(vars)
 // }
 
-func (o OrNode) BuildSql(clause SqlClauseFunc, addParens bool, args *[]string) string {
+func (o *OrNode) BuildSql(clause SqlClauseFunc, addParens bool, args *[]string) string {
 	return AddParens(o.Left.BuildSql(clause, true, args)+" OR "+o.Right.BuildSql(clause, true, args), addParens)
 }
 
@@ -349,7 +406,7 @@ func (p *Parser) parseOrSubClause() (Node, error) {
 				return nil, err
 			}
 
-			left = OrNode{Left: left, Right: right}
+			left = &OrNode{Left: left, Right: right}
 		} else {
 			break
 		}
@@ -369,7 +426,7 @@ func (p *Parser) parseNotSubClause() (Node, error) {
 			return nil, err
 		}
 
-		return NotNode{Child: child}, nil
+		return &NotNode{Child: child}, nil
 	}
 
 	// otherwise parse as normal search term
@@ -394,7 +451,7 @@ func (p *Parser) parseAndSubClause() (Node, error) {
 				return nil, err
 			}
 
-			left = AndNode{Left: left, Right: right}
+			left = &AndNode{Left: left, Right: right}
 		} else {
 			break
 		}
@@ -592,6 +649,7 @@ func AddParens(sql string, addParens bool) string {
 	if addParens {
 		return "(" + sql + ")"
 	}
+
 	return sql
 }
 
