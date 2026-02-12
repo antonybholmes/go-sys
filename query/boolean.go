@@ -11,6 +11,8 @@ import (
 	"github.com/antonybholmes/go-sys/log"
 )
 
+// Replace boolean words AND/OR with +/, but only when they are separate words
+// and not with quotes
 func normalizeBooleanWords(input string) string {
 	var b strings.Builder
 
@@ -31,10 +33,16 @@ func normalizeBooleanWords(input string) string {
 		// but cANDy stays as is
 		if !inQuotes && sys.IsLetter(ch) {
 			start := i
+			// find run of letters
 			for i < len(input) && sys.IsLetter(input[i]) {
 				i++
 			}
 
+			// since a run must start with a letter, then
+			// came before (and after) must be non-letter e.g.
+			// space, therefore if we see AND and OR they
+			// must be surrounded by non-letter chars and can
+			// be treated as boolean operators
 			word := input[start:i]
 			switch word {
 			case "AND":
@@ -42,11 +50,13 @@ func normalizeBooleanWords(input string) string {
 			case "OR":
 				b.WriteByte(',')
 			default:
+				// not a boolean word, write as is
 				b.WriteString(word)
 			}
 			continue
 		}
 
+		// not a letter, write as is
 		b.WriteByte(ch)
 		i++
 	}
@@ -80,16 +90,22 @@ func normalizeQuery(input string) string {
 				continue
 			}
 
-			// we last ended on a word character
-			// so this could be an implicit AND if
-			// it's a run of spaces between word characters
+			// if the last non-space character was a
+			// search term char e.g. a letter, we could
+			// be in the middle of an implicit AND i.e.
+			// a space between two search terms
+			// so we flag that we could be starting a
+			// run of spaces that represent an implicit AND
 			if isSearchTermChar(last) {
 				isRunOfSpaces = true
 			}
 
-		case '+', ',', '(':
+		case '+', ',': //, '(':
 			b.WriteRune(ch)
 
+			// if we are in a run of spaces
+			// cancel the run since are either
+			// AND/OR or
 			if !inQuotes {
 				last = ch
 				isRunOfSpaces = false
@@ -105,7 +121,7 @@ func normalizeQuery(input string) string {
 			isRunOfSpaces = false
 		case '?':
 			if !inQuotes {
-				// convert _ to _ for SQL single char wildcard
+				// convert ? to _ for SQL single char wildcard
 				ch = '_'
 			}
 

@@ -5,6 +5,16 @@ import (
 	"testing"
 )
 
+func TestNormalizeQuery(t *testing.T) {
+	x := normalizeQuery(`x+(y AND z) OR "a AND b"`)
+	fmt.Println(x)
+
+	x = normalizeQuery(` (y AND z)+x OR "a AND b"`)
+	fmt.Println(x)
+
+	// Test cases for normalizeQuery
+}
+
 func TestAdd(t *testing.T) {
 	resp, _ := SqlBoolQuery("A+B,=C+(D+E)", func(placeholderIndex int, value string, addParens bool) string {
 
