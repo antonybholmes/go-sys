@@ -1,6 +1,7 @@
 package sys
 
 import (
+	"cmp"
 	"encoding/base64"
 	"strconv"
 	"strings"
@@ -123,4 +124,9 @@ func IsUpperLetter(b byte) bool {
 
 func IsDigit(c byte) bool {
 	return c >= '0' && c <= '9'
+}
+
+// Clamp clamps x between x1 and x2.
+func Clamp[T cmp.Ordered](x, x1, x2 T) T {
+	return max(min(x, x2), x1)
 }

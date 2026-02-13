@@ -1,4 +1,4 @@
-package sys
+package collections
 
 import "slices"
 
@@ -19,4 +19,13 @@ func SortedMapKeys[K ~string, V any](m map[K]V) []K {
 	slices.Sort(keys)
 
 	return keys
+}
+
+// TruncateSlice truncates a slice to the specified maximum length.
+// If the slice is shorter than the maximum length, it is returned unchanged.
+func TruncateSlice[T any](s []T, max int) []T {
+	if len(s) > max {
+		return s[:max]
+	}
+	return s
 }
