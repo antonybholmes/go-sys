@@ -27,5 +27,6 @@ func TruncateSlice[T any](s []T, max int) []T {
 	if len(s) > max {
 		return s[:max]
 	}
+
 	return s
 }
