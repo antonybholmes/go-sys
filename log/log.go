@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -21,18 +22,8 @@ var (
 
 // initLogger initializes the logger only once
 func initLogger() {
-	if env == "development" {
-		consoleWriter := zerolog.ConsoleWriter{
-			Out:        os.Stderr,
-			TimeFormat: time.RFC3339,
-			FormatLevel: func(l interface{}) string {
-				return fmt.Sprintf("[%s]", l)
-			},
-		}
-		l := zerolog.New(consoleWriter).With().Timestamp().Logger()
-		zerolog.SetGlobalLevel(zerolog.DebugLevel)
-		logger = &l
-	} else {
+
+	if strings.HasPrefix(strings.ToLower(env), "prod") {
 		zerolog.SetGlobalLevel(zerolog.InfoLevel)
 
 		fileLogger := &lumberjack.Logger{
@@ -45,6 +36,18 @@ func initLogger() {
 
 		multi := io.MultiWriter(os.Stderr, fileLogger)
 		l := zerolog.New(multi).With().Timestamp().Logger()
+		logger = &l
+	} else {
+		// run in debug mode
+		consoleWriter := zerolog.ConsoleWriter{
+			Out:        os.Stderr,
+			TimeFormat: time.RFC3339,
+			FormatLevel: func(l interface{}) string {
+				return fmt.Sprintf("[%s]", l)
+			},
+		}
+		l := zerolog.New(consoleWriter).With().Timestamp().Logger()
+		zerolog.SetGlobalLevel(zerolog.DebugLevel)
 		logger = &l
 	}
 }
