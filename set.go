@@ -99,24 +99,24 @@ func (s *Set[T]) ListContains(values []T) bool {
 	return slices.ContainsFunc(values, s.Has)
 }
 
+// // Returns a list of the values in the set that are also in the provided list
+// func (s *Set[T]) WhichList(values []T) []T {
+// 	ret := make([]T, 0, len(values))
+
+// 	for _, v := range values {
+// 		if s.Has(v) {
+// 			ret = append(ret, v)
+// 		}
+// 	}
+
+// 	return ret
+// }
+
 // Returns a list of the values in the set that are also in the provided list
-func (s *Set[T]) WhichList(values []T) []T {
+func (s *Set[T]) Which(values []T) []T {
 	ret := make([]T, 0, len(values))
 
 	for _, v := range values {
-		if s.Has(v) {
-			ret = append(ret, v)
-		}
-	}
-
-	return ret
-}
-
-// Returns a list of the values in the set that are also in the provided list
-func (s *Set[T]) Which(values *Set[T]) []T {
-	ret := make([]T, 0, len(values.items))
-
-	for v := range values.items {
 		if s.Has(v) {
 			ret = append(ret, v)
 		}
@@ -151,6 +151,14 @@ func (s *StringSet) SortedKeys() []string {
 	slices.Sort(keys)
 
 	return keys
+}
+
+func SliceToSet[T comparable](items []T) *Set[T] {
+	s := NewSet[T]()
+	for _, v := range items {
+		s.Add(v)
+	}
+	return s
 }
 
 // func (s *StringSet) Add(v string) *StringSet {
