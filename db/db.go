@@ -1,4 +1,12 @@
-package sys
+package db
+
+import (
+	"database/sql"
+	"fmt"
+	"strings"
+
+	"github.com/antonybholmes/go-sys/collections"
+)
 
 type (
 	IdEntity struct {
@@ -23,4 +31,28 @@ const (
 	PostgresDB = "postgres"
 	MySQLDB    = "mysql"
 	BlankUUID  = "00000000-0000-0000-0000-000000000000"
+	MaxIds     = 100
 )
+
+func MakeInSql(query string, placeholder string, ids []string, namedArgs *[]any) string {
+	//inClause := MakePermissionsInClause(permissions, isAdmin, namedArgs)
+
+	// (:is_admin = 1 OR p.name IN (<<PERMISSIONS>>))
+
+	// limit permissions to MAX_PERMISSIONS
+	ids = collections.TruncateSlice(ids, MaxIds)
+
+	inPlaceholders := make([]string, len(ids))
+
+	for i, id := range ids {
+		ph := fmt.Sprintf("id%d", i+1)
+		inPlaceholders[i] = ":" + ph
+		*namedArgs = append(*namedArgs, sql.Named(ph, id))
+	}
+
+	// case sensitive match as permissions are precise
+	clause := "(" + strings.Join(inPlaceholders, ", ") + ")"
+
+	return strings.Replace(query, placeholder, clause, 1)
+
+}
