@@ -8,10 +8,10 @@ import (
 type VersionInfo struct {
 	Name      string `json:"name"`
 	Version   string `json:"version"`
-	Build     int    `json:"build"`
 	Copyright string `json:"copyright"`
 	License   string `json:"license"`
 	Updated   string `json:"updated"`
+	Build     int    `json:"build"`
 }
 
 func LoadVersionInfo(path string) (VersionInfo, error) {
