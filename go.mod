@@ -6,6 +6,7 @@ require (
 	github.com/joho/godotenv v1.5.1
 	github.com/rs/zerolog v1.35.1
 	github.com/xuri/excelize/v2 v2.10.1
+	golang.org/x/exp v0.0.0-20260611194520-c48552f49976
 )
 
 require github.com/tiendc/go-deepcopy v1.7.2 // indirect
