@@ -8,7 +8,8 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/google/uuid"
+	"uuid"
+
 	gonanoid "github.com/matoous/go-nanoid/v2"
 )
 
@@ -38,11 +39,7 @@ func Map[T, U any](ts []T, f func(T) U) []U {
 }
 
 func Uuidv7() (string, error) {
-	u, err := uuid.NewV7()
-	if err != nil {
-		return "", err
-	}
-
+	u := uuid.NewV7()
 	return u.String(), nil
 }
 
@@ -57,10 +54,9 @@ func DecodeB64Uuid(id string) (*uuid.UUID, error) {
 	if err != nil {
 		return nil, err
 	}
-	decID, err := uuid.FromBytes(dec)
-	if err != nil {
-		return nil, err
-	}
+
+	decID := uuid.UUID(dec)
+
 	return &decID, nil
 }
 
