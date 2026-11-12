@@ -6,6 +6,7 @@ import (
 	"golang.org/x/exp/constraints"
 )
 
+// Returns the absolute value of an integer.
 func AbsInt(x int) int {
 	if x < 0 {
 		return -x
@@ -14,18 +15,11 @@ func AbsInt(x int) int {
 	return x
 }
 
+// Returns the absolute difference between two integers.
 func AbsDiffInt(x, y int) int {
 	if x < y {
 		return y - x
 	}
-	return x - y
-}
-
-func AbsDiffint(x, y int) int {
-	if x < y {
-		return y - x
-	}
-
 	return x - y
 }
 
@@ -86,6 +80,7 @@ func LnFactorial(n int) float64 {
 	return ret
 }
 
+// Factorial returns the factorial of an integer n.
 func Factorial(n int) int64 {
 	if n == 0 {
 		return 1

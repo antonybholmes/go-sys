@@ -30,3 +30,13 @@ func TruncateSlice[T any](s []T, max int) []T {
 
 	return s
 }
+
+func Filter[T any](slice []T, keep func(T) bool) []T {
+	result := make([]T, 0, len(slice))
+	for _, item := range slice {
+		if keep(item) {
+			result = append(result, item)
+		}
+	}
+	return result
+}
