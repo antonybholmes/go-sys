@@ -1,58 +1,63 @@
 package sys
 
 import (
+	"cmp"
 	"maps"
 	"slices"
 )
 
 // Implementation of a set using generics and maps
 // since Go does not have sets built in
-type Set[T comparable] struct {
-	items map[T]struct{}
-}
+type Set[T comparable] map[T]struct{}
 
-func NewSet[T comparable]() *Set[T] {
-	return &Set[T]{items: make(map[T]struct{})}
+func NewSet[T comparable](items ...T) Set[T] {
+	s := make(Set[T], len(items))
+	for _, item := range items {
+		s[item] = struct{}{}
+	}
+	return s
 }
 
 // Returns the number of items in the set
-func (s *Set[T]) Len() int {
-	return len(s.items)
+func (s Set[T]) Len() int {
+	return len(s)
 }
 
 // Add an item to the set
-func (s *Set[T]) Add(v T) *Set[T] {
-	s.items[v] = struct{}{}
+func (s Set[T]) Add(v T) Set[T] {
+	// You add struct{}{} as the value in a Go map (like map[string]struct{}) because
+	// an empty struct occupies zero bytes of memory.
+	s[v] = struct{}{}
 	return s
 }
 
 // Removes an item from the set
-func (s *Set[T]) Remove(v T) *Set[T] {
-	delete(s.items, v)
+func (s Set[T]) Remove(v T) Set[T] {
+	delete(s, v)
 	return s
 }
 
 // Returns a boolean value describing if the value exists in the set
-func (s *Set[T]) Has(v T) bool {
-	_, ok := s.items[v]
+func (s Set[T]) Has(v T) bool {
+	_, ok := s[v]
 	return ok
 }
 
 // Returns a slice of the keys in the set
-func (s *Set[T]) Keys() []T {
+func (s Set[T]) Keys() []T {
 	// keys := make([]T, 0, len(s.items))
 	// for key := range s.items {
 	// 	keys = append(keys, key)
 	// }
 
-	return slices.Collect(maps.Keys(s.items))
+	return slices.Collect(maps.Keys(s))
 }
 
 // Returns the insection of a map with another
-func (s *Set[T]) Intersect(values *Set[T]) *Set[T] {
+func (s Set[T]) Intersect(values Set[T]) Set[T] {
 	ret := NewSet[T]()
 
-	for k := range s.items {
+	for k := range s {
 		if values.Has(k) {
 			ret.Add(k)
 		}
@@ -63,22 +68,22 @@ func (s *Set[T]) Intersect(values *Set[T]) *Set[T] {
 
 // Returns the union of a map with another. The
 // original sets are not modified.
-func (s *Set[T]) Union(values *Set[T]) *Set[T] {
+func (s Set[T]) Union(values Set[T]) Set[T] {
 	ret := NewSet[T]()
 
-	for k := range s.items {
+	for k := range s {
 		ret.Add(k)
 	}
 
-	for k := range values.items {
+	for k := range values {
 		ret.Add(k)
 	}
 
 	return ret
 }
 
-func (s *Set[T]) Update(values *Set[T]) *Set[T] {
-	for v := range values.items {
+func (s Set[T]) Update(values Set[T]) Set[T] {
+	for v := range values {
 		s.Add(v)
 	}
 
@@ -86,7 +91,7 @@ func (s *Set[T]) Update(values *Set[T]) *Set[T] {
 }
 
 // Add values from a list to the set
-func (s *Set[T]) ListUpdate(values []T) *Set[T] {
+func (s Set[T]) ListUpdate(values []T) Set[T] {
 	for _, v := range values {
 		s.Add(v)
 	}
@@ -95,8 +100,14 @@ func (s *Set[T]) ListUpdate(values []T) *Set[T] {
 }
 
 // Check if any of the values in the list are in this set
-func (s *Set[T]) ListContains(values []T) bool {
+func (s Set[T]) ListContains(values []T) bool {
 	return slices.ContainsFunc(values, s.Has)
+}
+
+func SortedKeys[T cmp.Ordered](s Set[T]) []T {
+	keys := s.Keys()
+	slices.Sort(keys)
+	return keys
 }
 
 // // Returns a list of the values in the set that are also in the provided list
@@ -126,40 +137,40 @@ func (s *Set[T]) Which(values []T) []T {
 }
 
 // Check if any the values in the values are in this set
-func (s *Set[T]) Contains(values *Set[T]) bool {
+func (s Set[T]) Contains(values Set[T]) bool {
 	return s.ListContains(values.Keys())
 }
 
-type StringSet struct {
-	// functions and fields of Set[string]
-	// are promoted to StringSet, but we can
-	// override them if needed
-	*Set[string]
-}
-
-// Creates a new Set of strings
-func NewStringSet() *StringSet {
-	return &StringSet{
-		Set: NewSet[string](), // assuming NewSet initializes the map
-	}
-}
-
-// StringSet keys are returned sorted
-func (s *StringSet) SortedKeys() []string {
-	keys := s.Keys()
-
-	slices.Sort(keys)
-
-	return keys
-}
-
-func SliceToSet[T comparable](items []T) *Set[T] {
+func SliceToSet[T comparable](items []T) Set[T] {
 	s := NewSet[T]()
 	for _, v := range items {
 		s.Add(v)
 	}
 	return s
 }
+
+// type StringSet struct {
+// 	// functions and fields of Set[string]
+// 	// are promoted to StringSet, but we can
+// 	// override them if needed
+// 	Set[string]
+// }
+
+// // Creates a new Set of strings
+// func NewStringSet(items ...string) StringSet {
+// 	return StringSet{
+// 		Set: NewSet(items...),
+// 	}
+// }
+
+// // StringSet keys are returned sorted
+// func (s *StringSet) SortedKeys() []string {
+// 	keys := s.Keys()
+
+// 	slices.Sort(keys)
+
+// 	return keys
+// }
 
 // func (s *StringSet) Add(v string) *StringSet {
 // 	s.items[v] = struct{}{}
