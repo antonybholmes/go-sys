@@ -52,8 +52,8 @@ func initLogger() {
 	}
 }
 
-// getLogger ensures initialization, no lock needed for reading
-func getLogger() *zerolog.Logger {
+// Instance ensures initialization, no lock needed for reading
+func Instance() *zerolog.Logger {
 	initOnce.Do(initLogger)
 	return logger
 }
@@ -73,9 +73,9 @@ func SetLogLevel(level zerolog.Level) {
 }
 
 // Expose logger methods
-func Debug() *zerolog.Event { return getLogger().Debug() }
-func Info() *zerolog.Event  { return getLogger().Info() }
-func Warn() *zerolog.Event  { return getLogger().Warn() }
-func Error() *zerolog.Event { return getLogger().Error() }
-func Fatal() *zerolog.Event { return getLogger().Fatal() }
-func Panic() *zerolog.Event { return getLogger().Panic() }
+func Debug() *zerolog.Event { return Instance().Debug() }
+func Info() *zerolog.Event  { return Instance().Info() }
+func Warn() *zerolog.Event  { return Instance().Warn() }
+func Error() *zerolog.Event { return Instance().Error() }
+func Fatal() *zerolog.Event { return Instance().Fatal() }
+func Panic() *zerolog.Event { return Instance().Panic() }
