@@ -8,7 +8,7 @@ import (
 func TestSet(t *testing.T) {
 	orig := []string{"z", "z", "a", "c", "b"}
 
-	set := NewStringSet()
+	set := NewSet[string]()
 	set.ListUpdate(orig)
 
 	fmt.Printf("set %v", set)
