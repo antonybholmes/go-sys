@@ -9,12 +9,12 @@ type (
 	// This is more for recording job metadata such as sending an email where
 	// details such as an S3 bucket or file key are not necessary.
 	BaseJob struct {
-		CreatedAt   time.Time `json:"createdAt"`
-		ID          string    `json:"id"`
-		UserID      string    `json:"userId"`
-		Email       string    `json:"email"`
-		Type        string    `json:"type"`
-		Description string    `json:"description,omitempty"`
+		CreatedAt time.Time `json:"createdAt"`
+		ID        string    `json:"id"`
+		// Name of the job, if applicable.
+		Name        string `json:"name,omitempty"`
+		Type        string `json:"type"`
+		Description string `json:"description,omitempty"`
 	}
 
 	// Job represents a unit of work to be processed.
