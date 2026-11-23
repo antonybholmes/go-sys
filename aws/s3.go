@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/antonybholmes/go-sys/log"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 )
@@ -16,6 +17,12 @@ type (
 	}
 )
 
+const (
+	ContentTypeHeader    = "Content-Type"
+	ContentTypeTextPlain = "text/plain"
+	ContentTypeJSON      = "application/json"
+)
+
 func NewS3Store(client *s3.Client, bucket string) *S3Store {
 	return &S3Store{
 		client: client,
@@ -25,8 +32,8 @@ func NewS3Store(client *s3.Client, bucket string) *S3Store {
 
 func (s *S3Store) Upload(ctx context.Context,
 	key string,
-	body io.ReadSeeker,
-	contentType string) error {
+	contentType string,
+	body io.ReadSeeker) error {
 	input := s3.PutObjectInput{
 		Bucket: aws.String(s.bucket),
 		Key:    aws.String(key),
@@ -42,6 +49,8 @@ func (s *S3Store) Upload(ctx context.Context,
 	if err != nil {
 		return fmt.Errorf("put S3 object: %w", err)
 	}
+
+	log.Debug().Msgf("Uploaded S3 object: %s", key)
 
 	return nil
 }

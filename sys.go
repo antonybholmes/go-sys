@@ -13,6 +13,11 @@ import (
 	gonanoid "github.com/matoous/go-nanoid/v2"
 )
 
+const (
+	DefaultNanoIdAlphabet = "0123456789abcdefghijklmnopqrstuvwxyz"
+	DefaultNanoIdLength   = 12
+)
+
 // panics on error or returns value, similar to google's
 // must in uuid but this is generic
 func Must[T any](v T, err error) T {
@@ -38,9 +43,9 @@ func Map[T, U any](ts []T, f func(T) U) []U {
 	return us
 }
 
-func Uuidv7() (string, error) {
-	u := uuid.NewV7()
-	return u.String(), nil
+func UUIDV7() string {
+	return uuid.NewV7().String()
+
 }
 
 func B64Uuid() string {
@@ -64,7 +69,7 @@ func DecodeB64Uuid(id string) (*uuid.UUID, error) {
 // most purposes. It's good enough for Planetscale
 // https://planetscale.com/blog/why-we-chose-nanoids-for-planetscales-api
 func NanoId() string {
-	id, err := gonanoid.Generate("0123456789abcdefghijklmnopqrstuvwxyz", 12)
+	id, err := gonanoid.Generate(DefaultNanoIdAlphabet, DefaultNanoIdLength)
 
 	if err != nil {
 		id = ""
