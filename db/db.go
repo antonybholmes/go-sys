@@ -18,6 +18,13 @@ type (
 		Name string `json:"name"`
 		IdEntity
 	}
+
+	// For returning record counts and pagination metadata.
+	RecordStats struct {
+		Count    int `json:"count"`
+		PageSize int `json:"pageSize"`
+		Pages    int `json:"pages"`
+	}
 )
 
 const (

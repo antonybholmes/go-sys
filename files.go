@@ -2,8 +2,11 @@ package sys
 
 import (
 	"mime"
+	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/antonybholmes/go-sys/log"
 )
 
 var (
@@ -16,6 +19,8 @@ var (
 		".svg":  "image/svg+xml",
 		".pdf":  "application/pdf",
 	}
+
+	FileModeOwnerFullGroupOtherReadEnter os.FileMode = 0755
 )
 
 func DetectContentType(filename string) string {
@@ -55,4 +60,21 @@ func FileExt(filename string) string {
 	// Return ext without dot
 	return strings.TrimPrefix(strings.ToLower(filepath.Ext(filename)), ".")
 
+}
+
+func OpenFile(path string) (*os.File, os.FileInfo, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to open local file")
+		return nil, nil, err
+	}
+
+	// need file size for S3 upload
+	stat, err := file.Stat()
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to stat local file")
+		return nil, nil, err
+	}
+
+	return file, stat, nil
 }

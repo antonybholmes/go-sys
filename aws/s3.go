@@ -4,7 +4,11 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
+	"path/filepath"
+	"strings"
 
+	"github.com/antonybholmes/go-sys"
 	"github.com/antonybholmes/go-sys/log"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -31,9 +35,9 @@ func NewS3Store(client *s3.Client, bucket string) *S3Store {
 }
 
 func (s *S3Store) Upload(ctx context.Context,
+	body io.ReadSeeker,
 	key string,
-	contentType string,
-	body io.ReadSeeker) error {
+	contentType string) error {
 	input := s3.PutObjectInput{
 		Bucket: aws.String(s.bucket),
 		Key:    aws.String(key),
@@ -68,6 +72,48 @@ func (s *S3Store) Download(ctx context.Context, key string) (io.ReadCloser, erro
 	}
 
 	return output.Body, nil
+}
+
+// DownloadLocal downloads an S3 object to a local file and returns the destination path.
+// If a dir path is given, file is saved with the S3 key's base name. If the path
+// includes a file name, that path is used as the destination file path.
+func (s *S3Store) DownloadLocal(ctx context.Context, key string, path string) (string, error) {
+	// key file name is unique so can strip it
+
+	// If path ends with slash, treat as folder and append the key's base name.
+	// Otherwise, treat path as the full destination file path.
+	if strings.HasSuffix(path, "/") {
+		path = filepath.Join(path, filepath.Base(key))
+	}
+
+	// download file to mem
+	src, err := s.Download(ctx, key)
+	if err != nil {
+		return "", err
+	}
+
+	defer src.Close()
+
+	// Make sure the destination directory exists.
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, sys.FileModeOwnerFullGroupOtherReadEnter); err != nil {
+		return "", err
+	}
+
+	// create local file
+	localFile, err := os.Create(path)
+	if err != nil {
+		return "", err
+	}
+	defer localFile.Close()
+
+	// copy downloaded content to local file
+	_, err = io.Copy(localFile, src)
+	if err != nil {
+		return "", err
+	}
+
+	return path, nil
 }
 
 func (s *S3Store) Delete(ctx context.Context, key string) error {

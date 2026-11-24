@@ -3,6 +3,7 @@ package aws
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/antonybholmes/go-sys/log"
@@ -10,6 +11,7 @@ import (
 	"github.com/antonybholmes/go-sys"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
+	"github.com/aws/aws-sdk-go-v2/service/sqs/types"
 	sqstypes "github.com/aws/aws-sdk-go-v2/service/sqs/types"
 	"github.com/panjf2000/ants"
 )
@@ -23,12 +25,13 @@ type (
 	// Standardized consumer of sqs messages to act as foundation
 	// for building specialized SQS consumers like email consumers
 	SQSConsumer struct {
-		Client       *sqs.Client
-		pool         *ants.Pool
-		backoff      *sys.Backoff
-		QueueURL     string
-		Threads      int
-		WaitTimeSecs int
+		Client          *sqs.Client
+		pool            *ants.Pool
+		backoff         *sys.Backoff
+		QueueURL        string
+		Threads         int
+		WaitTimeSecs    int
+		MaxReceiveCount int
 	}
 )
 
@@ -70,10 +73,15 @@ func (s *SQSSender) SendFifo(ctx context.Context,
 	return nil
 }
 
+// NewSQSConsumer creates a new SQSConsumer with the
+// given client, queue URL, thread count, wait time,
+// and maximum receive count.
+// If maxReceiveCount is greater than 0, messages exceeding that receive count are deleted.
 func NewSQSConsumer(client *sqs.Client,
 	queueURL string,
 	threads int,
 	waitTimeSecs int,
+	maxReceiveCount int,
 ) (*SQSConsumer, error) {
 
 	// cfg, err := config.LoadDefaultConfig(context.Background())
@@ -91,12 +99,13 @@ func NewSQSConsumer(client *sqs.Client,
 	}
 
 	return &SQSConsumer{
-		QueueURL:     queueURL,
-		Threads:      threads,
-		Client:       client,
-		WaitTimeSecs: waitTimeSecs, // default wait time, can be adjusted
-		pool:         pool,
-		backoff:      sys.NewDefaultBackoff(),
+		QueueURL:        queueURL,
+		Threads:         threads,
+		Client:          client,
+		WaitTimeSecs:    waitTimeSecs, // default wait time, can be adjusted
+		pool:            pool,
+		backoff:         sys.NewDefaultBackoff(),
+		MaxReceiveCount: maxReceiveCount,
 	}, nil
 }
 
@@ -113,6 +122,9 @@ func (c *SQSConsumer) Consume(ctx context.Context,
 			QueueUrl:            aws.String(c.QueueURL),
 			MaxNumberOfMessages: int32(c.Threads),
 			WaitTimeSeconds:     int32(c.WaitTimeSecs),
+			MessageSystemAttributeNames: []types.MessageSystemAttributeName{
+				types.MessageSystemAttributeNameApproximateReceiveCount,
+			},
 		})
 
 		if err != nil {
@@ -132,8 +144,23 @@ func (c *SQSConsumer) Consume(ctx context.Context,
 					return
 				}
 
+				receiveCount, err := GetReceiveCount(message)
+
+				if err != nil {
+					log.Error().Msgf("error getting receive count for SQS message: %v", err)
+					return
+				}
+
+				// Delete messages that have exceeded the maximum receive count
+				if c.MaxReceiveCount > 0 && receiveCount > c.MaxReceiveCount {
+					_ = c.DeleteMessage(ctx, message)
+
+					log.Warn().Msgf("SQS message %s has been received %d times", messageID, receiveCount)
+					return
+				}
+
 				// Seems like have a message so pass off to the message processor
-				err := processMessage(ctx, message)
+				err = processMessage(ctx, message)
 
 				if err != nil {
 					log.Error().Msgf("error processing SQS message: %v", err)
@@ -169,6 +196,17 @@ func (c *SQSConsumer) Close() {
 }
 
 // GetMessageID returns the ID of the SQS message, or "<unknown>" if it is not set.
+func GetReceiveCount(message sqstypes.Message) (int, error) {
+	if value, ok := message.Attributes[string(sqstypes.MessageSystemAttributeNameApproximateReceiveCount)]; ok {
+		count, err := strconv.Atoi(value)
+		if err == nil {
+			return count, nil
+		}
+	}
+
+	return -1, fmt.Errorf("invalid receive count for message %s", GetMessageID(message))
+}
+
 func GetMessageID(message sqstypes.Message) string {
 	if message.MessageId != nil {
 		return *message.MessageId

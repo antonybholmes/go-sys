@@ -51,6 +51,7 @@ func AbsDiffInt(x, y int) int {
 // 	return y
 // }
 
+// Min returns the smaller of a and b.
 func Min[T constraints.Ordered](a, b T) T {
 	if a < b {
 		return a
@@ -58,11 +59,23 @@ func Min[T constraints.Ordered](a, b T) T {
 	return b
 }
 
+// Max returns the larger of a and b.
 func Max[T constraints.Ordered](a, b T) T {
 	if a > b {
 		return a
 	}
 	return b
+}
+
+// Clamp returns value clamped to the inclusive range [min, max].
+func Clamp[T constraints.Ordered](value, min, max T) T {
+	if value < min {
+		return min
+	}
+	if value > max {
+		return max
+	}
+	return value
 }
 
 func LnFactorial(n int) float64 {
