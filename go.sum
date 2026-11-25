@@ -2,6 +2,8 @@ github.com/aws/aws-sdk-go-v2 v1.48.0 h1:tFU7EJVm7MfyaXLsXdYTZ0Vd6vwt9OljCyqq0gqk
 github.com/aws/aws-sdk-go-v2 v1.48.0/go.mod h1:oeKU5p+TQBnpeLmU42WZLWvzv+ORLn+74n4QVLnm/Z0=
 github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.7.27 h1:3dMP9eEmHVosFN1QiD24IJBKVY8m6iUfVYXqRCT118Q=
 github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.7.27/go.mod h1:KH4PKcqtjy1m0656eqQV2v53xE04ddJzuNloEKqlHkI=
+github.com/aws/aws-sdk-go-v2/feature/cloudfront/sign v1.12.12 h1:/D8vacrCyzD2j2p/3TQvdrp5LoPtUTjv9sIWeUgOqEM=
+github.com/aws/aws-sdk-go-v2/feature/cloudfront/sign v1.12.12/go.mod h1:Oo8XgAJqX6692NUD81Wt1PRaA16n/PAb2FWMUkobQCA=
 github.com/aws/aws-sdk-go-v2/internal/configsources v1.5.12 h1:W0yUUzKBA8SofGQ0yZafEUuZq9UxfvijRgdc6vcRQPA=
 github.com/aws/aws-sdk-go-v2/internal/configsources v1.5.12/go.mod h1:xwKv6vwBNdpPFOxEm/ld4IODZK2s/1ksHvdBqLfH6Gs=
 github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.8.12 h1:lqSi8qvAnKC1vfosImdmOsuiJLr/jdybZX5299beB6Q=
