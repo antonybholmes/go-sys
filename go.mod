@@ -26,6 +26,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.14.12 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/s3shared v1.20.12 // indirect
 	github.com/aws/smithy-go v1.28.9 // indirect
+	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/mattn/go-colorable v0.1.16 // indirect
 	github.com/mattn/go-isatty v0.0.24 // indirect
 	github.com/richardlehane/mscfb v1.0.10 // indirect

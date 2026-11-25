@@ -1,10 +1,12 @@
 package aws
 
 import (
+	"archive/zip"
 	"context"
 	"fmt"
 	"io"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 
@@ -114,6 +116,49 @@ func (s *S3Store) DownloadLocal(ctx context.Context, key string, path string) (s
 	}
 
 	return path, nil
+}
+
+// DownloadZip downloads the specified S3 objects into a ZIP archive written to writer.
+func (s *S3Store) DownloadZip(ctx context.Context, writer io.Writer, keys []string) error {
+	zipWriter := zip.NewWriter(writer)
+	defer zipWriter.Close()
+
+	for _, key := range keys {
+		src, err := s.Download(ctx, key)
+		if err != nil {
+			return err
+		}
+
+		// header := &zip.FileHeader{
+		// 	Name:   key,
+		// 	Method: zip.Deflate,
+		// }
+		// entry, err := zipWriter.CreateHeader(header)
+		// if err != nil {
+		// 	src.Close()
+		// 	return err
+		// }
+
+		// We use path instead of filepath because S3 keys always use forward slashes.
+		zipFile, err := zipWriter.Create(path.Base(key))
+		if err != nil {
+			src.Close()
+			return err
+		}
+
+		_, copyErr := io.Copy(zipFile, src)
+		closeErr := src.Close()
+
+		if copyErr != nil {
+			return copyErr
+		}
+
+		if closeErr != nil {
+			return closeErr
+		}
+	}
+
+	return nil
 }
 
 func (s *S3Store) Delete(ctx context.Context, key string) error {
