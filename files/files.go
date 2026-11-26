@@ -1,4 +1,4 @@
-package sys
+package files
 
 import (
 	"mime"

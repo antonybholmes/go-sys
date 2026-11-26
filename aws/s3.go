@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/antonybholmes/go-sys"
+	sysfiles "github.com/antonybholmes/go-sys/files"
 	"github.com/antonybholmes/go-sys/log"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -98,7 +98,7 @@ func (s *S3Store) DownloadLocal(ctx context.Context, key string, path string) (s
 
 	// Make sure the destination directory exists.
 	dir := filepath.Dir(path)
-	if err := os.MkdirAll(dir, sys.FileModeOwnerFullGroupOtherReadEnter); err != nil {
+	if err := os.MkdirAll(dir, sysfiles.FileModeOwnerFullGroupOtherReadEnter); err != nil {
 		return "", err
 	}
 
