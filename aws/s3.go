@@ -119,7 +119,7 @@ func (s *S3Store) DownloadLocal(ctx context.Context, key string, path string) (s
 }
 
 // DownloadZip downloads the specified S3 objects into a ZIP archive written to writer.
-func (s *S3Store) DownloadZip(ctx context.Context, writer io.Writer, keys []string) error {
+func (s *S3Store) DownloadZip(ctx context.Context, keys []string, writer io.Writer) error {
 	zipWriter := zip.NewWriter(writer)
 	defer zipWriter.Close()
 
