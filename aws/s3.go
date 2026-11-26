@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"mime"
 	"os"
 	"path"
 	"path/filepath"
@@ -27,6 +28,7 @@ const (
 	ContentTypeHeader    = "Content-Type"
 	ContentTypeTextPlain = "text/plain"
 	ContentTypeJSON      = "application/json"
+	ContentTypeZip       = "application/zip"
 )
 
 func NewS3Store(client *s3.Client, bucket string) *S3Store {
@@ -39,15 +41,16 @@ func NewS3Store(client *s3.Client, bucket string) *S3Store {
 func (s *S3Store) Upload(ctx context.Context,
 	body io.ReadSeeker,
 	key string,
-	contentType string) error {
-	input := s3.PutObjectInput{
-		Bucket: aws.String(s.bucket),
-		Key:    aws.String(key),
-		Body:   body,
-	}
+) error {
 
-	if contentType != "" {
-		input.ContentType = aws.String(contentType)
+	// Determine the content type based on the file extension
+	contentType := mime.TypeByExtension(filepath.Ext(key))
+
+	input := s3.PutObjectInput{
+		Bucket:      aws.String(s.bucket),
+		Key:         aws.String(key),
+		Body:        body,
+		ContentType: aws.String(contentType),
 	}
 
 	_, err := s.client.PutObject(ctx, &input)
@@ -59,6 +62,52 @@ func (s *S3Store) Upload(ctx context.Context,
 	log.Debug().Msgf("Uploaded S3 object: %s", key)
 
 	return nil
+}
+
+// Zip a set of files and upload the resulting archive to S3.
+func (s *S3Store) ZipAndUpload(ctx context.Context,
+	key string,
+	localFiles []string) (int64, error) {
+	// 1. Create a temporary file for the ZIP
+	tmpZip, err := os.CreateTemp("", "upload-*.zip")
+	if err != nil {
+		return 0, fmt.Errorf("create temp file: %w", err)
+	}
+
+	// Clean up the temp file from disk when done
+	defer os.Remove(tmpZip.Name())
+	defer tmpZip.Close()
+
+	// 2. Write all local files into the ZIP
+	zipWriter := zip.NewWriter(tmpZip)
+	for _, path := range localFiles {
+		if err := sysfiles.AddFileToZip(zipWriter, path); err != nil {
+			return 0, err
+		}
+	}
+
+	// Must close zipWriter before uploading so the ZIP footer is written
+	if err := zipWriter.Close(); err != nil {
+		return 0, fmt.Errorf("close zip writer: %w", err)
+	}
+
+	// 3. Rewind the temp file back to the beginning so S3 can read it
+	if _, err := tmpZip.Seek(0, io.SeekStart); err != nil {
+		return 0, fmt.Errorf("rewind temp file: %w", err)
+	}
+
+	// get file size
+	fileInfo, err := tmpZip.Stat()
+	if err != nil {
+		return 0, fmt.Errorf("stat temp file: %w", err)
+	}
+	fileSizeBytes := fileInfo.Size()
+
+	// 4. Upload to S3
+	if err := s.Upload(ctx, tmpZip, key); err != nil {
+		return 0, fmt.Errorf("upload zip to S3: %w", err)
+	}
+	return fileSizeBytes, nil
 }
 
 func (s *S3Store) Download(ctx context.Context, key string) (io.ReadCloser, error) {

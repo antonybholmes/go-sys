@@ -1,6 +1,9 @@
 package files
 
 import (
+	"archive/zip"
+	"fmt"
+	"io"
 	"mime"
 	"os"
 	"path/filepath"
@@ -77,4 +80,23 @@ func OpenFile(path string) (*os.File, os.FileInfo, error) {
 	}
 
 	return file, stat, nil
+}
+
+func AddFileToZip(zipWriter *zip.Writer, filePath string) error {
+	file, err := os.Open(filePath)
+	if err != nil {
+		return fmt.Errorf("open %s: %w", filePath, err)
+	}
+	defer file.Close()
+
+	writer, err := zipWriter.Create(filepath.Base(filePath))
+	if err != nil {
+		return fmt.Errorf("create zip entry %s: %w", filePath, err)
+	}
+
+	if _, err := io.Copy(writer, file); err != nil {
+		return fmt.Errorf("copy %s: %w", filePath, err)
+	}
+
+	return nil
 }
