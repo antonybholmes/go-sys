@@ -13,23 +13,24 @@ import (
 )
 
 var (
-	CommonMimeTypes = map[string]string{
-		".zip":  "application/zip",
-		".html": "text/html; charset=utf-8",
-		".json": "application/json",
-		".txt":  "text/plain; charset=utf-8",
-		".csv":  "text/csv; charset=utf-8",
-		".md":   "text/markdown; charset=utf-8",
-		".webp": "image/webp",
-		".svg":  "image/svg+xml",
-		".pdf":  "application/pdf",
-	}
+	// CommonMimeTypes = map[string]string{
+	// 	".zip":  "application/zip",
+	// 	".html": "text/html; charset=utf-8",
+	// 	".json": "application/json",
+	// 	".txt":  "text/plain; charset=utf-8",
+	// 	".csv":  "text/csv; charset=utf-8",
+	// 	".md":   "text/markdown; charset=utf-8",
+	// 	".webp": "image/webp",
+	// 	".svg":  "image/svg+xml",
+	// 	".pdf":  "application/pdf",
+	// }
 
 	FileModeOwnerFullGroupOtherReadEnter os.FileMode = 0755
 )
 
+// DetectContentType determines the MIME type of a file based on its extension.
+// Returns the MIME type as a string. If the extension is not recognized, it defaults to "application/octet-stream".
 func DetectContentType(filename string) string {
-
 	if mimeType := mime.TypeByExtension(strings.ToLower(filepath.Ext(filename))); mimeType != "" {
 		return mimeType
 	}
@@ -40,28 +41,21 @@ func DetectContentType(filename string) string {
 // DetectFileExtension returns the file extension for a given filename.
 // If the extension is a common MIME type, it returns the extension.
 // Otherwise, it defaults to "txt".
-// Unlike the FileExt function, this function returns the extension without the dot
-// which is more useful in most situations
-func DetectFileExtension(filename string) string {
-	// Return ext without dot
-	ext := FileExt(filename)
-
-	// Return the extension if it is a common MIME type.
-	if _, ok := CommonMimeTypes[ext]; ok {
-		return ext
-	}
-
-	return "txt"
-
-}
-
-// DetectFileExtension returns the file extension for a given filename.
-// If the extension is a common MIME type, it returns the extension.
-// Otherwise, it defaults to "txt".
 func FileExt(filename string) string {
 	// Return ext without dot
 	return strings.TrimPrefix(strings.ToLower(filepath.Ext(filename)), ".")
 
+}
+
+// FileExtOr returns the file extension for a given filename.
+// If the extension is empty, it returns the provided default
+// extension. Otherwise, it returns the actual file extension.
+func FileExtOr(filename, defaultExt string) string {
+	ext := FileExt(filename)
+	if ext == "" {
+		return defaultExt
+	}
+	return ext
 }
 
 // Open a file for reading and return the file handle and its FileInfo.

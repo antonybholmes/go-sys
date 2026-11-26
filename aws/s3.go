@@ -24,10 +24,10 @@ type (
 )
 
 const (
-	ContentTypeHeader    = "Content-Type"
-	ContentTypeTextPlain = "text/plain"
-	ContentTypeJSON      = "application/json"
-	ContentTypeZip       = "application/zip"
+	ContentTypeHeader = "Content-Type"
+	// ContentTypeTextPlain = "text/plain"
+	// ContentTypeJSON      = "application/json"
+	// ContentTypeZip       = "application/zip"
 )
 
 func NewS3Store(client *s3.Client, bucket string) *S3Store {
