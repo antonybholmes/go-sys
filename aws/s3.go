@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"mime"
 	"os"
 	"path"
 	"path/filepath"
@@ -44,7 +43,7 @@ func (s *S3Store) Upload(ctx context.Context,
 ) error {
 
 	// Determine the content type based on the file extension
-	contentType := mime.TypeByExtension(filepath.Ext(key))
+	contentType := sysfiles.DetectContentType(key)
 
 	input := s3.PutObjectInput{
 		Bucket:      aws.String(s.bucket),

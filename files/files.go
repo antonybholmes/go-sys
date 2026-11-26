@@ -14,6 +14,8 @@ import (
 
 var (
 	CommonMimeTypes = map[string]string{
+		".zip":  "application/zip",
+		".html": "text/html; charset=utf-8",
 		".json": "application/json",
 		".txt":  "text/plain; charset=utf-8",
 		".csv":  "text/csv; charset=utf-8",
@@ -27,13 +29,8 @@ var (
 )
 
 func DetectContentType(filename string) string {
-	ext := strings.ToLower(filepath.Ext(filename))
 
-	if mimeType, ok := CommonMimeTypes[ext]; ok {
-		return mimeType
-	}
-
-	if mimeType := mime.TypeByExtension(ext); mimeType != "" {
+	if mimeType := mime.TypeByExtension(strings.ToLower(filepath.Ext(filename))); mimeType != "" {
 		return mimeType
 	}
 
@@ -43,6 +40,8 @@ func DetectContentType(filename string) string {
 // DetectFileExtension returns the file extension for a given filename.
 // If the extension is a common MIME type, it returns the extension.
 // Otherwise, it defaults to "txt".
+// Unlike the FileExt function, this function returns the extension without the dot
+// which is more useful in most situations
 func DetectFileExtension(filename string) string {
 	// Return ext without dot
 	ext := FileExt(filename)
@@ -65,6 +64,7 @@ func FileExt(filename string) string {
 
 }
 
+// Open a file for reading and return the file handle and its FileInfo.
 func OpenFile(path string) (*os.File, os.FileInfo, error) {
 	file, err := os.Open(path)
 	if err != nil {
@@ -82,6 +82,7 @@ func OpenFile(path string) (*os.File, os.FileInfo, error) {
 	return file, stat, nil
 }
 
+// AddFileToZip adds a file to the given zip archive. The file is added with its base name.
 func AddFileToZip(zipWriter *zip.Writer, filePath string) error {
 	file, err := os.Open(filePath)
 	if err != nil {
@@ -89,12 +90,18 @@ func AddFileToZip(zipWriter *zip.Writer, filePath string) error {
 	}
 	defer file.Close()
 
+	return AddReaderToZip(zipWriter, filePath, file)
+}
+
+// Add contents of a reader to the zip file with the given file path as the entry name.
+func AddReaderToZip(zipWriter *zip.Writer, filePath string, reader io.Reader) error {
+
 	writer, err := zipWriter.Create(filepath.Base(filePath))
 	if err != nil {
 		return fmt.Errorf("create zip entry %s: %w", filePath, err)
 	}
 
-	if _, err := io.Copy(writer, file); err != nil {
+	if _, err := io.Copy(writer, reader); err != nil {
 		return fmt.Errorf("copy %s: %w", filePath, err)
 	}
 
