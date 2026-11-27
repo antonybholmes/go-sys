@@ -2,6 +2,7 @@ package aws
 
 import (
 	"crypto"
+	"net/url"
 	"strings"
 	"time"
 
@@ -14,7 +15,6 @@ type (
 		// without a trailing slash. Can also be a custom domain name
 		// if that is associated with CloudFront via Route 53 etc.
 		domain     string
-		keyID      string
 		privateKey crypto.Signer
 		signer     *sign.URLSigner
 	}
@@ -26,28 +26,27 @@ type (
 )
 
 // NewCloudFrontStore creates a CloudFrontStore for generating signed URLs.
-func NewCloudFrontStore(domain string, keyID string, privateKey crypto.Signer) *CloudFrontStore {
-	domain = strings.TrimSuffix(domain, "/")
+func NewCloudFrontStore(domain string, keyPairID string, privateKey crypto.Signer) *CloudFrontStore {
 
 	return &CloudFrontStore{
-		domain:     domain,
-		keyID:      keyID,
+		domain:     strings.TrimSuffix(domain, "/"),
 		privateKey: privateKey,
-		signer:     sign.NewURLSigner(keyID, privateKey),
+		signer:     sign.NewURLSigner(keyPairID, privateKey),
 	}
 }
 
-func (c *CloudFrontStore) OneHourSignedURL(key string) (*SignedURL, error) {
-	return c.GenerateSignedURL(key, time.Now().Add(time.Hour))
+func (c *CloudFrontStore) OneHourPresignedURL(key string) (*SignedURL, error) {
+	return c.GeneratePresignedURL(key, time.Now().Add(time.Hour))
 }
 
-func (c *CloudFrontStore) GenerateSignedURL(key string, expiration time.Time) (*SignedURL, error) {
-	// Standardize the key by removing any leading slash.
-	key = strings.TrimPrefix(key, "/")
+func (c *CloudFrontStore) GeneratePresignedURL(key string, expiration time.Time) (*SignedURL, error) {
 
 	// Url should form cleanly without duplicate slashes
 	// from domain and s3 key
-	url := c.domain + "/" + key
+	url, err := url.JoinPath(c.domain, key)
+	if err != nil {
+		return nil, err
+	}
 
 	signedURL, err := c.signer.Sign(url, expiration)
 	if err != nil {

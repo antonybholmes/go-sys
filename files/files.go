@@ -13,18 +13,6 @@ import (
 )
 
 var (
-	// CommonMimeTypes = map[string]string{
-	// 	".zip":  "application/zip",
-	// 	".html": "text/html; charset=utf-8",
-	// 	".json": "application/json",
-	// 	".txt":  "text/plain; charset=utf-8",
-	// 	".csv":  "text/csv; charset=utf-8",
-	// 	".md":   "text/markdown; charset=utf-8",
-	// 	".webp": "image/webp",
-	// 	".svg":  "image/svg+xml",
-	// 	".pdf":  "application/pdf",
-	// }
-
 	FileModeOwnerFullGroupOtherReadEnter os.FileMode = 0755
 )
 

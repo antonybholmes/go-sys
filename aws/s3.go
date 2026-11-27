@@ -64,6 +64,7 @@ func (s *S3Store) Upload(ctx context.Context,
 }
 
 // Zip a set of files and upload the resulting archive to S3.
+// Returns the size of the uploaded ZIP file in bytes and any error encountered.
 func (s *S3Store) ZipAndUpload(ctx context.Context,
 	key string,
 	localFiles []string) (int64, error) {
