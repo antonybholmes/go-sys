@@ -1,4 +1,4 @@
-package sys
+package dataframe
 
 import (
 	"bytes"
@@ -9,7 +9,7 @@ import (
 	"github.com/xuri/excelize/v2"
 )
 
-type Table struct {
+type DataFrame struct {
 	IndexNames []string   `json:"indexNames"`
 	Index      [][]string `json:"index"`
 	Columns    [][]string `json:"columns"`
@@ -40,12 +40,12 @@ func XlsxSheetNames(reader *bytes.Reader) ([]string, error) {
 }
 
 // Convert the first sheet of an excel file into a json representation
-func XlsxToJson(reader *bytes.Reader,
+func XlsxToDataFrame(reader *bytes.Reader,
 	sheet string,
 	indexes int,
 	headers int,
 	skipRows int,
-	trimWhitespace bool) (*Table, error) {
+	trimWhitespace bool) (*DataFrame, error) {
 
 	f, err := excelize.OpenReader(reader) // .OpenFile("Book1.xlsx")
 
@@ -135,7 +135,7 @@ func XlsxToJson(reader *bytes.Reader,
 		data[ri] = row[indexes:]
 	}
 
-	ret := Table{
+	ret := DataFrame{
 		IndexNames: indexNames,
 		Index:      indexData,
 		Columns:    columns,
